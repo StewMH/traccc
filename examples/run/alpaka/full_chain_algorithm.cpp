@@ -84,7 +84,8 @@ full_chain_algorithm::full_chain_algorithm(const full_chain_algorithm& parent)
           memory_resource{*m_cached_device_mr, &m_host_mr}, m_copy),
       m_finder_config(parent.m_finder_config),
       m_grid_config(parent.m_grid_config),
-      m_filter_config(parent.m_filter_config) {}
+      m_filter_config(parent.m_filter_config) {
+}
 
 full_chain_algorithm::~full_chain_algorithm() {
 

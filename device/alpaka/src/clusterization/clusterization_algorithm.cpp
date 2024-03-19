@@ -7,8 +7,9 @@
 
 // Local include(s).
 #include "traccc/alpaka/clusterization/clusterization_algorithm.hpp"
-#include "../utils/utils.hpp"
+
 #include "../utils/barrier.hpp"
+#include "../utils/utils.hpp"
 
 // Project include(s)
 #include "traccc/clusterization/device/aggregate_cluster.hpp"
@@ -113,7 +114,7 @@ clusterization_algorithm::output_type clusterization_algorithm::operator()(
 
     // Create result object for the CCL kernel with size overestimation
     measurement_collection_types::buffer measurements_buffer(num_cells,
-                                                                 m_mr.main);
+                                                             m_mr.main);
     m_copy.setup(measurements_buffer);
 
     // Counter for number of measurements
