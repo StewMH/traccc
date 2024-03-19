@@ -22,19 +22,24 @@ traccc_add_alpaka_library( traccc_alpaka alpaka TYPE SHARED
   # Utility definitions.
   "include/traccc/alpaka/utils/make_prefix_sum_buff.hpp"
   "src/utils/make_prefix_sum_buff.cpp"
+  "src/utils/barrier.hpp"
+  "src/utils/utils.hpp"
   # Seed finding code.
-  "include/traccc/alpaka/seeding/spacepoint_binning.hpp"
+  "include/traccc/alpaka/seeding/track_params_estimation.hpp"
   "include/traccc/alpaka/seeding/seed_finding.hpp"
   "include/traccc/alpaka/seeding/seeding_algorithm.hpp"
-  "include/traccc/alpaka/seeding/track_params_estimation.hpp"
+  "include/traccc/alpaka/seeding/spacepoint_binning.hpp"
+  # CCL Code.
+  "src/seeding/track_params_estimation.cpp"
+  "src/seeding/seed_finding.cpp"
+  "src/seeding/spacepoint_binning.cpp"
+  "src/seeding/seeding_algorithm.cpp"
   # Clusterization
   "include/traccc/alpaka/clusterization/clusterization_algorithm.hpp"
   "src/clusterization/clusterization_algorithm.cpp"
-  # Seeding code
-  "src/seeding/spacepoint_binning.cpp"
-  "src/seeding/seed_finding.cpp"
-  "src/seeding/seeding_algorithm.cpp"
-  "src/seeding/track_params_estimation.cpp"
+  # Finding
+  "include/traccc/alpaka/finding/finding_algorithm.hpp"
+  "src/finding/finding_algorithm.cpp"
 )
 
 target_link_libraries(traccc_alpaka PUBLIC ${PUBLIC_LIBRARIES} PRIVATE ${PRIVATE_LIBRARIES})
