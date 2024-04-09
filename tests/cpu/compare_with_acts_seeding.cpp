@@ -197,6 +197,7 @@ TEST_P(CompareWithActsSeedingTests, Run) {
     // setup spacepoint grid config
     Acts::SpacePointGridConfig gridConf;
 
+    gridConf.bFieldInZ = acts_options.bFieldInZ;
     gridConf.minPt = acts_config.minPt;
     gridConf.rMax = acts_config.rMax;
     gridConf.zMax = acts_config.zMax;
