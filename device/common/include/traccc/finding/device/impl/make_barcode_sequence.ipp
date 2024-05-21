@@ -12,7 +12,7 @@
 
 namespace traccc::device {
 
-TRACCC_DEVICE inline void make_barcode_sequence(
+TRACCC_HOST_DEVICE inline void make_barcode_sequence(
     std::size_t globalIndex,
     measurement_collection_types::const_view uniques_view,
     vecmem::data::vector_view<detray::geometry::barcode> barcodes_view) {
