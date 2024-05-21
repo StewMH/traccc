@@ -1,6 +1,6 @@
 # TRACCC library, part of the ACTS project (R&D line)
 #
-# (c) 2021-2023 CERN for the benefit of the ACTS project
+# (c) 2021-2024 CERN for the benefit of the ACTS project
 #
 # Mozilla Public License Version 2.0
 
@@ -29,6 +29,7 @@ traccc_add_test(
     # Define the sources for the test.
     test_basic.cu
     test_cca.cpp
+    test_ckf_combinatorics_telescope.cpp
     test_ckf_toy_detector.cpp
     test_copy.cu
     test_kalman_fitter_telescope.cpp
@@ -41,6 +42,7 @@ traccc_add_test(
 
     LINK_LIBRARIES
     CUDA::cudart
+    traccc::Thrust
     GTest::gtest
     vecmem::cuda
     detray::core
@@ -55,3 +57,11 @@ traccc_add_test(
     traccc_tests_cuda_main
     traccc_tests_common
 )
+
+# For CUDA 11 turn on separable compilation. This is necessary for using
+# Thrust 2.1.0.
+if( ( "${CMAKE_CUDA_COMPILER_ID}" STREQUAL "NVIDIA" ) AND
+    ( "${CMAKE_CUDA_COMPILER_VERSION}" VERSION_LESS "12.0" ) )
+    set_target_properties( traccc_test_cuda PROPERTIES
+        CUDA_SEPARABLE_COMPILATION ON )
+endif()

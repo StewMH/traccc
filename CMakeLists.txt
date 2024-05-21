@@ -1,12 +1,12 @@
 # TRACCC library, part of the ACTS project (R&D line)
 #
-# (c) 2021-2023 CERN for the benefit of the ACTS project
+# (c) 2021-2024 CERN for the benefit of the ACTS project
 #
 # Mozilla Public License Version 2.0
 
 # Set up the project.
 cmake_minimum_required( VERSION 3.9 )
-project( traccc VERSION 0.6.0 LANGUAGES CXX )
+project( traccc VERSION 0.11.0 LANGUAGES CXX )
 
 # Set up the used C++ standard(s).
 set( CMAKE_CXX_STANDARD 17 CACHE STRING "The (host) C++ standard to use" )
@@ -51,6 +51,7 @@ endif()
 # Flags controlling which parts of traccc to build.
 option( TRACCC_BUILD_CUDA "Build the CUDA sources included in traccc"
    ${TRACCC_BUILD_CUDA_DEFAULT} )
+option( TRACCC_BUILD_HIP "Build the HIP sources included in traccc" FALSE)
 option( TRACCC_BUILD_SYCL "Build the SYCL sources included in traccc" FALSE )
 option( TRACCC_BUILD_FUTHARK "Build the Futhark sources included in traccc"
    FALSE )
@@ -117,13 +118,26 @@ set( TRACCC_THRUST_OPTIONS "" CACHE STRING
    "Extra options for configuring how Thrust should be used" )
 mark_as_advanced( TRACCC_THRUST_OPTIONS )
 thrust_create_target( traccc::Thrust ${TRACCC_THRUST_OPTIONS} )
-# Make sure that Thrust/CUB headers are treated as system headers.
-get_target_property( _thrustIncludeDir Thrust::Thrust INTERFACE_INCLUDE_DIRECTORIES )
-get_target_property( _cubIncludeDir CUB::CUB INTERFACE_INCLUDE_DIRECTORIES )
-target_include_directories( traccc::Thrust
-   SYSTEM INTERFACE ${_thrustIncludeDir} ${_cubIncludeDir} )
-unset( _thrustIncludeDir )
-unset( _cubIncludeDir )
+
+# Set up rocThrust.
+option( TRACCC_SETUP_ROCTHRUST
+   "Set up the rocThrust target(s) explicitly" FALSE )
+option( TRACCC_USE_SYSTEM_ROCTHRUST
+   "Pick up an existing installation of rocThrust from the build environment"
+   ${TRACCC_USE_SYSTEM_LIBS} )
+if( TRACCC_SETUP_ROCTHRUST )
+   set( ROCM_WARN_TOOLCHAIN_VAR FALSE CACHE BOOL "Don't print ROCm warnings" )
+   set( ROCM_ERROR_TOOLCHAIN_VAR FALSE CACHE BOOL "Don't print ROCm errors" )
+   mark_as_advanced( ROCM_WARN_TOOLCHAIN_VAR ROCM_ERROR_TOOLCHAIN_VAR )
+   if( TRACCC_USE_SYSTEM_ROCTHRUST )
+      find_package( rocThrust REQUIRED )
+   else()
+      add_subdirectory( extern/rocThrust )
+   endif()
+   # Dress up the rocthrust target a little.
+   target_compile_definitions( rocthrust INTERFACE
+      THRUST_IGNORE_CUB_VERSION_CHECK )
+endif()
 
 # Set up TBB.
 option( TRACCC_SETUP_TBB
