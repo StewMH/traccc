@@ -38,6 +38,7 @@
 #include <thrust/fill.h>
 #include <thrust/scan.h>
 #include <thrust/sort.h>
+#include <thrust/unique.h>
 
 // System include(s).
 #include <vector>
@@ -218,109 +219,113 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
     auto thrustExecPolicy = thrust::host;
 #endif
 
-    // // Get number of seeds
-    // const auto n_seeds = m_copy.get_size(seeds_buffer);
+    // Get number of seeds
+    const auto n_seeds = m_copy.get_size(seeds_buffer);
 
-    // // Prepare input parameters with seeds
-    // bound_track_parameters_collection_types::buffer in_params_buffer(
-    //     m_copy.get_size(seeds_buffer), m_mr.main);
-    // bound_track_parameters_collection_types::device in_params(in_params_buffer);
-    // bound_track_parameters_collection_types::device seeds(seeds_buffer);
-    // thrust::copy(thrustExecPolicy, seeds.begin(), seeds.end(),
-    //              in_params.begin());
+    // Prepare input parameters with seeds
+    bound_track_parameters_collection_types::buffer in_params_buffer(
+        m_copy.get_size(seeds_buffer), m_mr.main);
+    bound_track_parameters_collection_types::device in_params(in_params_buffer);
+    bound_track_parameters_collection_types::device seeds(seeds_buffer);
+    thrust::copy(thrustExecPolicy, seeds.begin(), seeds.end(),
+                 in_params.begin());
 
-    // // Create a map for links
-    // std::map<unsigned int, vecmem::data::vector_buffer<candidate_link>>    //     link_map;
+    // Create a map for links
+    std::map<unsigned int, vecmem::data::vector_buffer<candidate_link>>
+        link_map;
 
-    // // Create a map for parameter ID to link ID
-    // std::map<unsigned int, vecmem::data::vector_buffer<unsigned int>>
-    //     param_to_link_map;
+    // Create a map for parameter ID to link ID
+    std::map<unsigned int, vecmem::data::vector_buffer<unsigned int>>
+        param_to_link_map;
 
+    // Create a map for tip links
+    std::map<unsigned int, vecmem::data::vector_buffer<
+                               typename candidate_link::link_index_type>>
+        tips_map;
 
-    // // Create a map for tip links
-    // std::map<unsigned int, vecmem::data::vector_buffer<
-    //                            typename candidate_link::link_index_type>>
-    //     tips_map;
+    // Link size
+    std::vector<std::size_t> n_candidates_per_step;
+    n_candidates_per_step.reserve(m_cfg.max_track_candidates_per_track);
 
-    // // Link size
-    // std::vector<std::size_t> n_candidates_per_step;
-    // n_candidates_per_step.reserve(m_cfg.max_track_candidates_per_track);
+    std::vector<std::size_t> n_parameters_per_step;
+    n_parameters_per_step.reserve(m_cfg.max_track_candidates_per_track);
 
-    // std::vector<std::size_t> n_parameters_per_step;
-    // n_parameters_per_step.reserve(m_cfg.max_track_candidates_per_track);
+    // Global counter object in Device memory
+    auto bufAcc_counter =
+        ::alpaka::allocBuf<device::finding_global_counter, Idx>(devAcc, 1u);
 
-    // // Global counter object in Device memory
-    // auto bufAcc_counter =
-    //     ::alpaka::allocBuf<device::finding_global_counter, Idx>(devAcc, 1u);
+    // Global counter object in Host memory
+    auto bufHost_counter =
+        ::alpaka::allocBuf<device::finding_global_counter, Idx>(devHost, 1u);
+    device::finding_global_counter* const pBufHost_counter =
+        ::alpaka::getPtrNative(bufHost_counter);
+    ::alpaka::memset(queue, bufHost_counter, 0);
+    ::alpaka::memcpy(queue, bufAcc_counter, bufHost_counter);
 
-    // // Global counter object in Host memory
-    // auto bufHost_counter =
-    //     ::alpaka::allocBuf<device::finding_global_counter, Idx>(devHost, 1u);
-    // device::finding_global_counter* const pBufHost_counter =
-    //     ::alpaka::getPtrNative(bufHost_counter);
-    // ::alpaka::memset(queue, bufHost_counter, 0);
-    // ::alpaka::memcpy(queue, bufAcc_counter, bufHost_counter);
+    /*****************************************************************
+     * Measurement Operations
+     *****************************************************************/
 
-    // // /*****************************************************************
-    // //  * Measurement Operations
-    // //  *****************************************************************/
+    measurement_collection_types::const_view::size_type n_measurements =
+        m_copy.get_size(measurements);
 
-    // measurement_collection_types::const_device measurements_device(
-    //     measurements);
+    // Get copy of barcode uniques
+    measurement_collection_types::buffer uniques_buffer{n_measurements,
+                                                        m_mr.main};
+    measurement_collection_types::device uniques(uniques_buffer);
 
-    // // Get copy of barcode uniques
-    // measurement_collection_types::buffer uniques_buffer{
-    //     measurements_device.size(), m_mr.main};
-    // measurement_collection_types::device uniques(uniques_buffer);
+    measurement* end =
+        thrust::unique_copy(thrustExecPolicy, measurements.ptr(),
+                            measurements.ptr() + n_measurements,
+                            uniques.begin(), measurement_equal_comp());
+    unsigned int n_modules = end - uniques.begin();
 
-    // measurement* end = thrust::unique_copy(
-    //     thrustExecPolicy, measurements_device.begin(),
-    //     measurements_device.end(), uniques.begin(), measurement_equal_comp());
-    // unsigned int n_modules = end - uniques.begin();
+    // Get upper bounds of unique elements
+    vecmem::data::vector_buffer<unsigned int> upper_bounds_buffer{n_modules,
+                                                                  m_mr.main};
+    vecmem::device_vector<unsigned int> upper_bounds(upper_bounds_buffer);
 
-    // // Get upper bounds of unique elements
-    // vecmem::data::vector_buffer<unsigned int> upper_bounds_buffer{n_modules,
-    //                                                               m_mr.main};
-    // vecmem::device_vector<unsigned int> upper_bounds(upper_bounds_buffer);
+    thrust::upper_bound(thrustExecPolicy, measurements.ptr(),
+                        measurements.ptr() + n_measurements, uniques.begin(),
+                        uniques.begin() + n_modules, upper_bounds.begin(),
+                        measurement_sort_comp());
 
-    // thrust::upper_bound(thrustExecPolicy, measurements_device.begin(),
-    //                     measurements_device.end(), uniques.begin(),
-    //                     uniques.begin() + n_modules, upper_bounds.begin(),
-    //                     measurement_sort_comp());
+    /*****************************************************************
+     * Kernel1: Create barcode sequence
+     *****************************************************************/
 
-    // /*****************************************************************
-    //  * Kernel1: Create barcode sequence
-    //  *****************************************************************/
+    vecmem::data::vector_buffer<detray::geometry::barcode> barcodes_buffer{
+        n_modules, m_mr.main};
 
-    // vecmem::data::vector_buffer<detray::geometry::barcode> barcodes_buffer{
-    //     n_modules, m_mr.main};
+    auto blocksPerGrid =
+        (barcodes_buffer.size() + threadsPerBlock - 1) / threadsPerBlock;
+    auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
-    // auto blocksPerGrid =
-    //     (barcodes_buffer.size() + threadsPerBlock - 1) / threadsPerBlock;
-    // auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
+    ::alpaka::exec<Acc>(queue, workDiv, MakeBarcodeSequenceKernel{},
+                        vecmem::get_data(uniques_buffer), vecmem::get_data(barcodes_buffer));
+    ::alpaka::wait(queue);
 
-    // ::alpaka::exec<Acc>(queue, workDiv, MakeBarcodeSequenceKernel{},
-    //                     measurements_device, barcodes_buffer);
-    // ::alpaka::wait(queue);
+    for (unsigned int step = 0; step < m_cfg.max_track_candidates_per_track;
+         step++) {
 
-    // for (unsigned int step = 0; step < m_cfg.max_track_candidates_per_track;
-    //      step++) {
+        // Previous step
+        const unsigned int prev_step = (step == 0 ? 0 : step - 1);
 
-    //     ::alpaka::memcpy(queue, bufHost_counter, bufAcc_counter);
-    //     ::alpaka::wait(queue);
+        ::alpaka::memcpy(queue, bufHost_counter, bufAcc_counter);
+        ::alpaka::wait(queue);
 
-    //     // Set the number of input parameters
-    //     const unsigned int n_in_params = (step == 0)
-    //                                          ? in_params_buffer.size()
-    //                                          : pBufHost_counter->n_out_params;
+        // Set the number of input parameters
+        const unsigned int n_in_params = (step == 0)
+                                             ? in_params_buffer.size()
+                                             : pBufHost_counter->n_out_params;
 
-    //     // Terminate if there is no parameter to process.
-    //     if (n_in_params == 0) {
-    //         break;
-    //     }
+        // Terminate if there is no parameter to process.
+        if (n_in_params == 0) {
+            break;
+        }
 
-    //     // Reset the global counter
-    //     ::alpaka::memset(queue, bufAcc_counter, 0);
+        // Reset the global counter
+        ::alpaka::memset(queue, bufAcc_counter, 0);
 
         /*****************************************************************
          * Kernel2: Apply material interaction
@@ -476,7 +481,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
 
         //     // Swap parameter buffer for the next step
         //     in_params_buffer = std::move(out_params_buffer);
-    // }
+    }
 
     // // Create link buffer
     // vecmem::data::jagged_vector_buffer<candidate_link> links_buffer(
@@ -591,9 +596,5 @@ namespace alpaka {
 template <>
 struct IsKernelArgumentTriviallyCopyable<
     traccc::measurement_collection_types::const_device> : std::true_type {};
-
-template <>
-struct IsKernelArgumentTriviallyCopyable<
-    vecmem::data::vector_view<detray::geometry::barcode>> : std::true_type {};
 
 }  // namespace alpaka
