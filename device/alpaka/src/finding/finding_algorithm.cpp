@@ -68,15 +68,14 @@ struct ApplyInteractionKernel {
                                    typename detector_t::transform3>>&
             nav_candidates_buffer,
         const int n_params,
-        bound_track_parameters_collection_types::view params_view
-        ) const {
+        bound_track_parameters_collection_types::view params_view) const {
 
         int globalThreadIdx =
             ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
 
         device::apply_interaction<detector_t>(globalThreadIdx, det_data,
-                                                 nav_candidates_buffer,
-                                                 n_params, params_view);
+                                              nav_candidates_buffer, n_params,
+                                              params_view);
     }
 };
 
@@ -159,9 +158,10 @@ struct PropagateToNextSurfaceKernel {
 };
 
 struct BuildTracksKernel {
-    template <typename TAcc>
+    template <typename TAcc, typename config_t>
     ALPAKA_FN_ACC void operator()(
         TAcc const& acc,
+        const config_t cfg,
         const measurement_collection_types::const_view& measurements_view,
         const bound_track_parameters_collection_types::const_view& seeds_view,
         const vecmem::data::jagged_vector_view<const candidate_link>&
@@ -170,14 +170,17 @@ struct BuildTracksKernel {
             param_to_link_view,
         const vecmem::data::vector_view<
             const typename candidate_link::link_index_type>& tips_view,
-        track_candidate_container_types::view track_candidates_view) const {
+        track_candidate_container_types::view track_candidates_view,
+        vecmem::data::vector_view<unsigned int> valid_indices_view,
+        unsigned int& n_valid_tracks) const {
 
         int globalThreadIdx =
             ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
 
-        device::build_tracks(globalThreadIdx, measurements_view, seeds_view,
+        device::build_tracks(globalThreadIdx, cfg, measurements_view, seeds_view,
                              links_view, param_to_link_view, tips_view,
-                             track_candidates_view);
+                             track_candidates_view, valid_indices_view,
+                             n_valid_tracks);
     }
 };
 
@@ -209,263 +212,271 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
     m_copy.setup(seeds_buffer);
     m_copy.setup(navigation_buffer);
 
-#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
+#if defined(ALPAKA_ACC_GPU_CUDA_ENABLED) || defined(ALPAKA_ACC_GPU_HIP_ENABLED)
     auto thrustExecPolicy = thrust::device;
 #else
     auto thrustExecPolicy = thrust::host;
 #endif
 
-    // Get number of seeds
-    const auto n_seeds = m_copy.get_size(seeds_buffer);
+    // // Get number of seeds
+    // const auto n_seeds = m_copy.get_size(seeds_buffer);
 
-    // Prepare input parameters with seeds
-    bound_track_parameters_collection_types::buffer in_params_buffer(
-        m_copy.get_size(seeds_buffer), m_mr.main);
-    bound_track_parameters_collection_types::device in_params(in_params_buffer);
-    bound_track_parameters_collection_types::device seeds(seeds_buffer);
-    thrust::copy(thrustExecPolicy, seeds.begin(), seeds.end(),
-                 in_params.begin());
+    // // Prepare input parameters with seeds
+    // bound_track_parameters_collection_types::buffer in_params_buffer(
+    //     m_copy.get_size(seeds_buffer), m_mr.main);
+    // bound_track_parameters_collection_types::device in_params(in_params_buffer);
+    // bound_track_parameters_collection_types::device seeds(seeds_buffer);
+    // thrust::copy(thrustExecPolicy, seeds.begin(), seeds.end(),
+    //              in_params.begin());
 
-    // Create a map for links
-    std::map<unsigned int, vecmem::data::vector_buffer<candidate_link>>
-        link_map;
+    // // Create a map for links
+    // std::map<unsigned int, vecmem::data::vector_buffer<candidate_link>>    //     link_map;
 
-    // Create a map for parameter ID to link ID
-    std::map<unsigned int, vecmem::data::vector_buffer<unsigned int>>
-        param_to_link_map;
+    // // Create a map for parameter ID to link ID
+    // std::map<unsigned int, vecmem::data::vector_buffer<unsigned int>>
+    //     param_to_link_map;
 
-    // Create a map for tip links
-    std::map<unsigned int, vecmem::data::vector_buffer<
-                               typename candidate_link::link_index_type>>
-        tips_map;
 
-    // Link size
-    std::vector<std::size_t> n_candidates_per_step;
-    n_candidates_per_step.reserve(m_cfg.max_track_candidates_per_track);
+    // // Create a map for tip links
+    // std::map<unsigned int, vecmem::data::vector_buffer<
+    //                            typename candidate_link::link_index_type>>
+    //     tips_map;
 
-    std::vector<std::size_t> n_parameters_per_step;
-    n_parameters_per_step.reserve(m_cfg.max_track_candidates_per_track);
+    // // Link size
+    // std::vector<std::size_t> n_candidates_per_step;
+    // n_candidates_per_step.reserve(m_cfg.max_track_candidates_per_track);
 
-    // Global counter object in Device memory
-    auto bufAcc_counter =
-        ::alpaka::allocBuf<device::finding_global_counter, Idx>(devAcc, 1u);
+    // std::vector<std::size_t> n_parameters_per_step;
+    // n_parameters_per_step.reserve(m_cfg.max_track_candidates_per_track);
 
-    // Global counter object in Host memory
-    auto bufHost_counter =
-        ::alpaka::allocBuf<device::finding_global_counter, Idx>(devHost, 1u);
-    device::finding_global_counter* const pBufHost_counter =
-        ::alpaka::getPtrNative(bufHost_counter);
-    ::alpaka::memset(queue, bufHost_counter, 0);
-    ::alpaka::memcpy(queue, bufAcc_counter, bufHost_counter);
+    // // Global counter object in Device memory
+    // auto bufAcc_counter =
+    //     ::alpaka::allocBuf<device::finding_global_counter, Idx>(devAcc, 1u);
+
+    // // Global counter object in Host memory
+    // auto bufHost_counter =
+    //     ::alpaka::allocBuf<device::finding_global_counter, Idx>(devHost, 1u);
+    // device::finding_global_counter* const pBufHost_counter =
+    //     ::alpaka::getPtrNative(bufHost_counter);
+    // ::alpaka::memset(queue, bufHost_counter, 0);
+    // ::alpaka::memcpy(queue, bufAcc_counter, bufHost_counter);
+
+    // // /*****************************************************************
+    // //  * Measurement Operations
+    // //  *****************************************************************/
+
+    // measurement_collection_types::const_device measurements_device(
+    //     measurements);
+
+    // // Get copy of barcode uniques
+    // measurement_collection_types::buffer uniques_buffer{
+    //     measurements_device.size(), m_mr.main};
+    // measurement_collection_types::device uniques(uniques_buffer);
+
+    // measurement* end = thrust::unique_copy(
+    //     thrustExecPolicy, measurements_device.begin(),
+    //     measurements_device.end(), uniques.begin(), measurement_equal_comp());
+    // unsigned int n_modules = end - uniques.begin();
+
+    // // Get upper bounds of unique elements
+    // vecmem::data::vector_buffer<unsigned int> upper_bounds_buffer{n_modules,
+    //                                                               m_mr.main};
+    // vecmem::device_vector<unsigned int> upper_bounds(upper_bounds_buffer);
+
+    // thrust::upper_bound(thrustExecPolicy, measurements_device.begin(),
+    //                     measurements_device.end(), uniques.begin(),
+    //                     uniques.begin() + n_modules, upper_bounds.begin(),
+    //                     measurement_sort_comp());
 
     // /*****************************************************************
-    //  * Measurement Operations
+    //  * Kernel1: Create barcode sequence
     //  *****************************************************************/
 
-    measurement_collection_types::const_device measurements_device(
-        measurements);
+    // vecmem::data::vector_buffer<detray::geometry::barcode> barcodes_buffer{
+    //     n_modules, m_mr.main};
 
-    // Get copy of barcode uniques
-    measurement_collection_types::buffer uniques_buffer{
-        measurements_device.size(), m_mr.main};
-    measurement_collection_types::device uniques(uniques_buffer);
+    // auto blocksPerGrid =
+    //     (barcodes_buffer.size() + threadsPerBlock - 1) / threadsPerBlock;
+    // auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
-    measurement* end = thrust::unique_copy(
-        thrustExecPolicy, measurements_device.begin(),
-        measurements_device.end(), uniques.begin(),
-        measurement_equal_comp());
-    unsigned int n_modules = end - uniques.begin();
+    // ::alpaka::exec<Acc>(queue, workDiv, MakeBarcodeSequenceKernel{},
+    //                     measurements_device, barcodes_buffer);
+    // ::alpaka::wait(queue);
 
-    // Get upper bounds of unique elements
-    vecmem::data::vector_buffer<unsigned int> upper_bounds_buffer{n_modules,
-                                                                  m_mr.main};
-    vecmem::device_vector<unsigned int> upper_bounds(upper_bounds_buffer);
+    // for (unsigned int step = 0; step < m_cfg.max_track_candidates_per_track;
+    //      step++) {
 
-    thrust::upper_bound(thrustExecPolicy,
-                        measurements_device.begin(),
-                        measurements_device.end(), uniques.begin(),
-                        uniques.begin() + n_modules, upper_bounds.begin(),
-                        measurement_sort_comp());
+    //     ::alpaka::memcpy(queue, bufHost_counter, bufAcc_counter);
+    //     ::alpaka::wait(queue);
 
-    /*****************************************************************
-     * Kernel1: Create barcode sequence
-     *****************************************************************/
+    //     // Set the number of input parameters
+    //     const unsigned int n_in_params = (step == 0)
+    //                                          ? in_params_buffer.size()
+    //                                          : pBufHost_counter->n_out_params;
 
-    vecmem::data::vector_buffer<detray::geometry::barcode> barcodes_buffer{
-        n_modules, m_mr.main};
+    //     // Terminate if there is no parameter to process.
+    //     if (n_in_params == 0) {
+    //         break;
+    //     }
 
-    auto blocksPerGrid =
-        (barcodes_buffer.size() + threadsPerBlock - 1) /
-        threadsPerBlock;
-    auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
-
-    ::alpaka::exec<Acc>(queue, workDiv, MakeBarcodeSequenceKernel{},
-                        measurements_device, barcodes_buffer);
-    ::alpaka::wait(queue);
-
-    for (unsigned int step = 0; step < m_cfg.max_track_candidates_per_track;
-         step++) {
-
-        ::alpaka::memcpy(queue, bufHost_counter, bufAcc_counter);
-        ::alpaka::wait(queue);
-
-        // Set the number of input parameters
-        const unsigned int n_in_params = (step == 0)
-                                             ? in_params_buffer.size()
-                                             :
-                                             pBufHost_counter->n_out_params;
-
-        // Terminate if there is no parameter to process.
-        if (n_in_params == 0) {
-            break;
-        }
-
-        // Reset the global counter
-        ::alpaka::memset(queue, bufAcc_counter, 0);
+    //     // Reset the global counter
+    //     ::alpaka::memset(queue, bufAcc_counter, 0);
 
         /*****************************************************************
          * Kernel2: Apply material interaction
          ****************************************************************/
 
-        blocksPerGrid = (n_in_params + threadsPerBlock - 1) / threadsPerBlock;
-        workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
+        // blocksPerGrid = (n_in_params + threadsPerBlock - 1) / threadsPerBlock;
+        // workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
         // kernels::apply_interaction<detector_type>
         //     <<<nBlocks, nThreads, 0, stream>>>(det_view, navigation_buffer,
         //                                        n_in_params,
         //                                        in_params_buffer);
         // CUDA_ERROR_CHECK(cudaGetLastError());
-        // ::alpaka::exec<Acc, detector_type>(queue, workDiv, ApplyInteractionKernel{},
+        // ::alpaka::exec<Acc, detector_type>(queue, workDiv,
+        // ApplyInteractionKernel{},
         //     det_view);
         // ::alpaka::wait(queue);
 
-    //     /*****************************************************************
-    //      * Kernel3: Count the number of measurements per parameter
-    //      ****************************************************************/
+        //     /*****************************************************************
+        //      * Kernel3: Count the number of measurements per parameter
+        //      ****************************************************************/
 
-    //     vecmem::data::vector_buffer<unsigned int> n_measurements_buffer(
-    //         n_in_params, m_mr.main);
+        //     vecmem::data::vector_buffer<unsigned int> n_measurements_buffer(
+        //         n_in_params, m_mr.main);
 
-    //     // Create a buffer for the first measurement index of parameter
-    //     vecmem::data::vector_buffer<unsigned int> ref_meas_idx_buffer(
-    //         n_in_params, m_mr.main);
+        //     // Create a buffer for the first measurement index of parameter
+        //     vecmem::data::vector_buffer<unsigned int> ref_meas_idx_buffer(
+        //         n_in_params, m_mr.main);
 
-    //     nThreads = WARP_SIZE * 2;
-    //     nBlocks = (n_in_params + nThreads - 1) / nThreads;
-    //     kernels::count_measurements<<<nBlocks, nThreads, 0, stream>>>(
-    //         in_params_buffer, barcodes_buffer, upper_bounds_buffer,
-    //         n_in_params, n_measurements_buffer, ref_meas_idx_buffer,
-    //         (*global_counter_device).n_measurements_sum);
-    //     CUDA_ERROR_CHECK(cudaGetLastError());
+        //     nThreads = WARP_SIZE * 2;
+        //     nBlocks = (n_in_params + nThreads - 1) / nThreads;
+        //     kernels::count_measurements<<<nBlocks, nThreads, 0, stream>>>(
+        //         in_params_buffer, barcodes_buffer, upper_bounds_buffer,
+        //         n_in_params, n_measurements_buffer, ref_meas_idx_buffer,
+        //         (*global_counter_device).n_measurements_sum);
+        //     CUDA_ERROR_CHECK(cudaGetLastError());
 
-    //     // Global counter object: Device -> Host
-    //     CUDA_ERROR_CHECK(cudaMemcpyAsync(&global_counter_host,
-    //                                      global_counter_device.get(),
-    //                                      sizeof(device::finding_global_counter),
-    //                                      cudaMemcpyDeviceToHost, stream));
+        //     // Global counter object: Device -> Host
+        //     CUDA_ERROR_CHECK(cudaMemcpyAsync(&global_counter_host,
+        //                                      global_counter_device.get(),
+        //                                      sizeof(device::finding_global_counter),
+        //                                      cudaMemcpyDeviceToHost,
+        //                                      stream));
 
-    //     m_stream.synchronize();
+        //     m_stream.synchronize();
 
-    //     // Create the buffer for the prefix sum of the number of measurements
-    //     // per parameter
-    //     vecmem::device_vector<unsigned int> n_measurements(
-    //         n_measurements_buffer);
-    //     vecmem::data::vector_buffer<unsigned int>
-    //         n_measurements_prefix_sum_buffer(n_in_params, m_mr.main);
-    //     vecmem::device_vector<unsigned int> n_measurements_prefix_sum(
-    //         n_measurements_prefix_sum_buffer);
-    //     thrust::inclusive_scan(thrust::cuda::par.on(stream),
-    //                            n_measurements.begin(), n_measurements.end(),
-    //                            n_measurements_prefix_sum.begin());
+        //     // Create the buffer for the prefix sum of the number of
+        //     measurements
+        //     // per parameter
+        //     vecmem::device_vector<unsigned int> n_measurements(
+        //         n_measurements_buffer);
+        //     vecmem::data::vector_buffer<unsigned int>
+        //         n_measurements_prefix_sum_buffer(n_in_params, m_mr.main);
+        //     vecmem::device_vector<unsigned int> n_measurements_prefix_sum(
+        //         n_measurements_prefix_sum_buffer);
+        //     thrust::inclusive_scan(thrust::cuda::par.on(stream),
+        //                            n_measurements.begin(),
+        //                            n_measurements.end(),
+        //                            n_measurements_prefix_sum.begin());
 
-    //     /*****************************************************************
-    //      * Kernel4: Find valid tracks
-    //      *****************************************************************/
+        //     /*****************************************************************
+        //      * Kernel4: Find valid tracks
+        //      *****************************************************************/
 
-    //     // Buffer for kalman-updated parameters spawned by the measurement
-    //     // candidates
-    //     const unsigned int n_max_candidates =
-    //         std::min(n_in_params * m_cfg.max_num_branches_per_surface,
-    //                  seeds.size() * m_cfg.max_num_branches_per_seed);
+        //     // Buffer for kalman-updated parameters spawned by the
+        //     measurement
+        //     // candidates
+        //     const unsigned int n_max_candidates =
+        //         std::min(n_in_params * m_cfg.max_num_branches_per_surface,
+        //                  seeds.size() * m_cfg.max_num_branches_per_seed);
 
-    //     bound_track_parameters_collection_types::buffer
-    //     updated_params_buffer(
-    //         n_in_params * m_cfg.max_num_branches_per_surface, m_mr.main);
+        //     bound_track_parameters_collection_types::buffer
+        //     updated_params_buffer(
+        //         n_in_params * m_cfg.max_num_branches_per_surface, m_mr.main);
 
-    //     // Create the link map
-    //     link_map[step] = {n_in_params * m_cfg.max_num_branches_per_surface,
-    //                       m_mr.main};
-    //     m_copy.setup(link_map[step]);
-    //     nBlocks = (global_counter_host.n_measurements_sum +
-    //                nThreads * m_cfg.n_measurements_per_thread - 1) /
-    //               (nThreads * m_cfg.n_measurements_per_thread);
+        //     // Create the link map
+        //     link_map[step] = {n_in_params *
+        //     m_cfg.max_num_branches_per_surface,
+        //                       m_mr.main};
+        //     m_copy.setup(link_map[step]);
+        //     nBlocks = (global_counter_host.n_measurements_sum +
+        //                nThreads * m_cfg.n_measurements_per_thread - 1) /
+        //               (nThreads * m_cfg.n_measurements_per_thread);
 
-    //     if (nBlocks > 0) {
-    //         kernels::find_tracks<detector_type, config_type>
-    //             <<<nBlocks, nThreads, 0, stream>>>(
-    //                 m_cfg, det_view, measurements, in_params_buffer,
-    //                 n_measurements_prefix_sum_buffer, ref_meas_idx_buffer,
-    //                 step, n_max_candidates, updated_params_buffer,
-    //                 link_map[step],
-    //                 (*global_counter_device).n_candidates);
-    //         CUDA_ERROR_CHECK(cudaGetLastError());
-    //     }
+        //     if (nBlocks > 0) {
+        //         kernels::find_tracks<detector_type, config_type>
+        //             <<<nBlocks, nThreads, 0, stream>>>(
+        //                 m_cfg, det_view, measurements, in_params_buffer,
+        //                 n_measurements_prefix_sum_buffer,
+        //                 ref_meas_idx_buffer, step, n_max_candidates,
+        //                 updated_params_buffer, link_map[step],
+        //                 (*global_counter_device).n_candidates);
+        //         CUDA_ERROR_CHECK(cudaGetLastError());
+        //     }
 
-    //     // Global counter object: Device -> Host
-    //     CUDA_ERROR_CHECK(cudaMemcpyAsync(&global_counter_host,
-    //                                      global_counter_device.get(),
-    //                                      sizeof(device::finding_global_counter),
-    //                                      cudaMemcpyDeviceToHost, stream));
+        //     // Global counter object: Device -> Host
+        //     CUDA_ERROR_CHECK(cudaMemcpyAsync(&global_counter_host,
+        //                                      global_counter_device.get(),
+        //                                      sizeof(device::finding_global_counter),
+        //                                      cudaMemcpyDeviceToHost,
+        //                                      stream));
 
-    //     m_stream.synchronize();
+        //     m_stream.synchronize();
 
-    //     /*****************************************************************
-    //      * Kernel5: Propagate to the next surface
-    //      *****************************************************************/
+        //     /*****************************************************************
+        //      * Kernel5: Propagate to the next surface
+        //      *****************************************************************/
 
-    //     // Buffer for out parameters for the next step
-    //     bound_track_parameters_collection_types::buffer out_params_buffer(
-    //         global_counter_host.n_candidates, m_mr.main);
+        //     // Buffer for out parameters for the next step
+        //     bound_track_parameters_collection_types::buffer
+        //     out_params_buffer(
+        //         global_counter_host.n_candidates, m_mr.main);
 
-    //     // Create the param to link ID map
-    //     param_to_link_map[step] = {global_counter_host.n_candidates,
-    //     m_mr.main}; m_copy.setup(param_to_link_map[step]);
+        //     // Create the param to link ID map
+        //     param_to_link_map[step] = {global_counter_host.n_candidates,
+        //     m_mr.main}; m_copy.setup(param_to_link_map[step]);
 
-    //     // Create the tip map
-    //     tips_map[step] = {global_counter_host.n_candidates, m_mr.main,
-    //                       vecmem::data::buffer_type::resizable};
-    //     m_copy.setup(tips_map[step]);
+        //     // Create the tip map
+        //     tips_map[step] = {global_counter_host.n_candidates, m_mr.main,
+        //                       vecmem::data::buffer_type::resizable};
+        //     m_copy.setup(tips_map[step]);
 
-    //     nThreads = WARP_SIZE * 2;
+        //     nThreads = WARP_SIZE * 2;
 
-    //     if (global_counter_host.n_candidates > 0) {
-    //         nBlocks =
-    //             (global_counter_host.n_candidates + nThreads - 1) / nThreads;
-    //         kernels::propagate_to_next_surface<propagator_type, bfield_type,
-    //                                            config_type>
-    //             <<<nBlocks, nThreads, 0, stream>>>(
-    //                 m_cfg, det_view, field_view, navigation_buffer,
-    //                 updated_params_buffer, link_map[step], step,
-    //                 (*global_counter_device).n_candidates, out_params_buffer,
-    //                 param_to_link_map[step], tips_map[step],
-    //                 (*global_counter_device).n_out_params);
-    //         CUDA_ERROR_CHECK(cudaGetLastError());
-    //     }
+        //     if (global_counter_host.n_candidates > 0) {
+        //         nBlocks =
+        //             (global_counter_host.n_candidates + nThreads - 1) /
+        //             nThreads;
+        //         kernels::propagate_to_next_surface<propagator_type,
+        //         bfield_type,
+        //                                            config_type>
+        //             <<<nBlocks, nThreads, 0, stream>>>(
+        //                 m_cfg, det_view, field_view, navigation_buffer,
+        //                 updated_params_buffer, link_map[step], step,
+        //                 (*global_counter_device).n_candidates,
+        //                 out_params_buffer, param_to_link_map[step],
+        //                 tips_map[step],
+        //                 (*global_counter_device).n_out_params);
+        //         CUDA_ERROR_CHECK(cudaGetLastError());
+        //     }
 
-    //     CUDA_ERROR_CHECK(cudaMemcpyAsync(&global_counter_host,
-    //                                      global_counter_device.get(),
-    //                                      sizeof(device::finding_global_counter),
-    //                                      cudaMemcpyDeviceToHost, stream));
+        //     CUDA_ERROR_CHECK(cudaMemcpyAsync(&global_counter_host,
+        //                                      global_counter_device.get(),
+        //                                      sizeof(device::finding_global_counter),
+        //                                      cudaMemcpyDeviceToHost,
+        //                                      stream));
 
-    //     m_stream.synchronize();
+        //     m_stream.synchronize();
 
-    //     // Fill the candidate size vector
-    //     n_candidates_per_step.push_back(global_counter_host.n_candidates);
-    //     n_parameters_per_step.push_back(global_counter_host.n_out_params);
+        //     // Fill the candidate size vector
+        //     n_candidates_per_step.push_back(global_counter_host.n_candidates);
+        //     n_parameters_per_step.push_back(global_counter_host.n_out_params);
 
-    //     // Swap parameter buffer for the next step
-    //     in_params_buffer = std::move(out_params_buffer);
-    }
+        //     // Swap parameter buffer for the next step
+        //     in_params_buffer = std::move(out_params_buffer);
+    // }
 
     // // Create link buffer
     // vecmem::data::jagged_vector_buffer<candidate_link> links_buffer(
@@ -567,19 +578,22 @@ using default_detector_type =
     detray::detector<detray::default_metadata, detray::device_container_types>;
 using default_stepper_type =
     detray::rk_stepper<covfie::field<detray::bfield::const_bknd_t>::view_t,
-                       transform3, detray::constrained_step<>>;
+                       traccc::default_algebra, detray::constrained_step<>>;
 using default_navigator_type = detray::navigator<const default_detector_type>;
 template class finding_algorithm<default_stepper_type, default_navigator_type>;
 
 }  // namespace traccc::alpaka
 
-// Add an Alpaka trait that the measurement_collection_types::const_device type is trivially copyable
+// Add an Alpaka trait that the measurement_collection_types::const_device type
+// is trivially copyable
 namespace alpaka {
 
 template <>
-struct IsKernelArgumentTriviallyCopyable<traccc::measurement_collection_types::const_device> : std::true_type {};
+struct IsKernelArgumentTriviallyCopyable<
+    traccc::measurement_collection_types::const_device> : std::true_type {};
 
-template<>
-struct IsKernelArgumentTriviallyCopyable<vecmem::data::vector_view<detray::geometry::barcode>> : std::true_type {};
+template <>
+struct IsKernelArgumentTriviallyCopyable<
+    vecmem::data::vector_view<detray::geometry::barcode>> : std::true_type {};
 
-}  // namespace alpaka::trait
+}  // namespace alpaka
