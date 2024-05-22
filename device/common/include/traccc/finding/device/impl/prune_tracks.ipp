@@ -9,7 +9,7 @@
 
 namespace traccc::device {
 
-TRACCC_DEVICE inline void prune_tracks(
+TRACCC_HOST_DEVICE inline void prune_tracks(
     std::size_t globalIndex,
     track_candidate_container_types::const_view track_candidates_view,
     vecmem::data::vector_view<const unsigned int> valid_indices_view,
