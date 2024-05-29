@@ -216,7 +216,7 @@ struct PruneTracksKernel {
     template <typename TAcc>
     ALPAKA_FN_ACC void operator()(
         TAcc const& acc,
-        const track_candidate_container_types::view* track_candidates_view,
+        track_candidate_container_types::const_view* track_candidates_view,
         const vecmem::data::vector_view<const unsigned int> valid_indices_view,
         track_candidate_container_types::view* pruned_candidates_view) const {
 
@@ -628,6 +628,8 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
          m_mr.main, m_mr.host, vecmem::data::buffer_type::resizable}};
     track_candidate_container_types::view track_candidates(
         track_candidates_buffer);
+    track_candidate_container_types::const_view track_candidates_const(
+        track_candidates_buffer);
 
     m_copy.setup(track_candidates_buffer.headers);
     m_copy.setup(track_candidates_buffer.items);
@@ -636,12 +638,23 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
     auto bufAcc_candidates =
         ::alpaka::allocBuf<track_candidate_container_types::view, Idx>(devAcc,
                                                                        1u);
+    auto bufAcc_const_candidates =
+        ::alpaka::allocBuf<track_candidate_container_types::const_view, Idx>(
+            devAcc, 1u);
+
     auto bufHost_candidates =
         ::alpaka::allocBuf<track_candidate_container_types::view, Idx>(devHost,
                                                                        1u);
+    auto bufHost_const_candidates =
+        ::alpaka::allocBuf<track_candidate_container_types::const_view, Idx>(
+            devHost, 1u);
+
     track_candidate_container_types::view* pBufHost_candidates =
         ::alpaka::getPtrNative(bufHost_candidates);
     pBufHost_candidates = &track_candidates;
+    track_candidate_container_types::const_view* pBufHost_const_candidates =
+        ::alpaka::getPtrNative(bufHost_const_candidates);
+    pBufHost_const_candidates = &track_candidates_const;
 
     // Copy the track candidate buffer to the device
     ::alpaka::memcpy(queue, bufAcc_candidates, bufHost_candidates);
@@ -709,7 +722,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
         workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
         ::alpaka::exec<Acc>(queue, workDiv, PruneTracksKernel{},
-                            ::alpaka::getPtrNative(bufAcc_candidates),
+                            ::alpaka::getPtrNative(bufAcc_const_candidates),
                             vecmem::get_data(valid_indices_buffer),
                             ::alpaka::getPtrNative(bufAcc_prune_candidates));
         ::alpaka::wait(queue);
