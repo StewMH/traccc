@@ -9,17 +9,19 @@ include( traccc-alpaka-functions )
 include( traccc-compiler-options-cpp )
 
 set(PUBLIC_LIBRARIES traccc::core detray::core detray::utils vecmem::core covfie::core)
-set(PRIVATE_LIBRARIES traccc::device_common alpaka::alpaka traccc::Thrust)
+set(PRIVATE_LIBRARIES traccc::device_common alpaka::alpaka)
 
 if(alpaka_ACC_GPU_CUDA_ENABLE)
   enable_language(CUDA)
   include( traccc-compiler-options-cuda )
 
-  list(APPEND PRIVATE_LIBRARIES CUDA::cudart vecmem::cuda)
+  list(APPEND PRIVATE_LIBRARIES CUDA::cudart vecmem::cuda traccc::Thrust)
 elseif(alpaka_ACC_GPU_HIP_ENABLE)
   enable_language(HIP)
   find_package( HIPToolkit REQUIRED )
-  list(APPEND PRIVATE_LIBRARIES HIP::hiprt vecmem::hip)
+  list(APPEND PRIVATE_LIBRARIES HIP::hiprt vecmem::hip rocThrust)
+else()
+  list(APPEND PRIVATE_LIBRARIES traccc::Thrust)
 endif()
 
 traccc_add_alpaka_library( traccc_alpaka alpaka TYPE SHARED
