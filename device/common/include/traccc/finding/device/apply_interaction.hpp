@@ -21,7 +21,7 @@ namespace traccc::device {
 /// @param[out] params_view    Collection of output bound track_parameters
 ///
 template <typename detector_t>
-TRACCC_DEVICE inline void apply_interaction(
+TRACCC_HOST_DEVICE inline void apply_interaction(
     std::size_t globalIndex, typename detector_t::view_type det_data,
     const int n_params,
     bound_track_parameters_collection_types::view params_view);

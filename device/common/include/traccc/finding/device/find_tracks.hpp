@@ -41,7 +41,7 @@ namespace traccc::device {
 /// current step
 ///
 template <typename detector_t, typename config_t>
-TRACCC_DEVICE inline void find_tracks(
+TRACCC_HOST_DEVICE inline void find_tracks(
     std::size_t globalIndex, const config_t cfg,
     typename detector_t::view_type det_data,
     measurement_collection_types::const_view measurements_view,

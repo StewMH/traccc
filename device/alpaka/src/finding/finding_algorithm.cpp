@@ -198,7 +198,7 @@ struct BuildTracksKernel {
             param_to_link_view,
         const vecmem::data::vector_view<
             const typename candidate_link::link_index_type>& tips_view,
-        track_candidate_container_types::view track_candidates_view,
+        track_candidate_container_types::view* track_candidates_view,
         vecmem::data::vector_view<unsigned int> valid_indices_view,
         device::finding_global_counter* counter) const {
 
@@ -207,7 +207,7 @@ struct BuildTracksKernel {
 
         device::build_tracks(globalThreadIdx, cfg, measurements_view,
                              seeds_view, links_view, param_to_link_view,
-                             tips_view, track_candidates_view,
+                             tips_view, *track_candidates_view,
                              valid_indices_view, counter->n_valid_tracks);
     }
 };
@@ -216,16 +216,15 @@ struct PruneTracksKernel {
     template <typename TAcc>
     ALPAKA_FN_ACC void operator()(
         TAcc const& acc,
-        const track_candidate_container_types::const_view&
-            track_candidates_view,
+        const track_candidate_container_types::view* track_candidates_view,
         const vecmem::data::vector_view<const unsigned int> valid_indices_view,
-        track_candidate_container_types::view pruned_candidates_view) const {
+        track_candidate_container_types::view* pruned_candidates_view) const {
 
         int globalThreadIdx =
             ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
 
-        device::prune_tracks(globalThreadIdx, track_candidates_view,
-                             valid_indices_view, pruned_candidates_view);
+        device::prune_tracks(globalThreadIdx, *track_candidates_view,
+                             valid_indices_view, *pruned_candidates_view);
     }
 };
 
@@ -627,31 +626,49 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
         {std::vector<std::size_t>(n_tips_total,
                                   m_cfg.max_track_candidates_per_track),
          m_mr.main, m_mr.host, vecmem::data::buffer_type::resizable}};
+    track_candidate_container_types::view track_candidates(
+        track_candidates_buffer);
 
     m_copy.setup(track_candidates_buffer.headers);
     m_copy.setup(track_candidates_buffer.items);
+
+    // Wrap the track candidate buffer in an alpaka buffer
+    auto bufAcc_candidates =
+        ::alpaka::allocBuf<track_candidate_container_types::view, Idx>(devAcc,
+                                                                       1u);
+    auto bufHost_candidates =
+        ::alpaka::allocBuf<track_candidate_container_types::view, Idx>(devHost,
+                                                                       1u);
+    track_candidate_container_types::view* pBufHost_candidates =
+        ::alpaka::getPtrNative(bufHost_candidates);
+    pBufHost_candidates = &track_candidates;
+
+    // Copy the track candidate buffer to the device
+    ::alpaka::memcpy(queue, bufAcc_candidates, bufHost_candidates);
+    ::alpaka::wait(queue);
 
     // Create buffer for valid indices
     vecmem::data::vector_buffer<unsigned int> valid_indices_buffer(n_tips_total,
                                                                    m_mr.main);
 
-    // @Note: nBlocks can be zero in case there is no tip. This happens when
-    // chi2_max config is set tightly and no tips are found
+    // @Note: blocksPerGrid can be zero in case there is no tip. This happens
+    // when chi2_max config is set tightly and no tips are found
     if (n_tips_total > 0) {
         blocksPerGrid = (n_tips_total + threadsPerBlock - 1) / threadsPerBlock;
         workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
-        // ::alpaka::exec<Acc>(
-        //     queue, workDiv,
-        //     BuildTracksKernel<config_type>{}, m_cfg, measurements,
-        //     vecmem::get_data(seeds_buffer),
-        //     vecmem::get_data(links_buffer),
-        //     vecmem::get_data(param_to_link_buffer),
-        //     vecmem::get_data(tips_buffer),
-        //     track_candidates_buffer,
-        //     vecmem::get_data(valid_indices_buffer),
-        //     pBufHost_counter);
-        // ::alpaka::wait(queue);
+        // ::alpaka::exec<Acc>(queue, workDiv, TestKernel{},
+        // ::alpaka::getPtrNative(bufAcc_candidates));
+
+        ::alpaka::exec<Acc>(queue, workDiv, BuildTracksKernel<config_type>{},
+                            m_cfg, measurements, vecmem::get_data(seeds_buffer),
+                            vecmem::get_data(links_buffer),
+                            vecmem::get_data(param_to_link_buffer),
+                            vecmem::get_data(tips_buffer),
+                            ::alpaka::getPtrNative(bufAcc_candidates),
+                            vecmem::get_data(valid_indices_buffer),
+                            ::alpaka::getPtrNative(bufAcc_counter));
+        ::alpaka::wait(queue);
     }
 
     // Global counter object: Device -> Host
@@ -664,9 +681,26 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
         {std::vector<std::size_t>(pBufHost_counter->n_valid_tracks,
                                   m_cfg.max_track_candidates_per_track),
          m_mr.main, m_mr.host, vecmem::data::buffer_type::resizable}};
+    track_candidate_container_types::view prune_candidates(
+        prune_candidates_buffer);
 
     m_copy.setup(prune_candidates_buffer.headers);
     m_copy.setup(prune_candidates_buffer.items);
+
+    // Wrap the pruned candidate buffer in an alpaka buffer
+    auto bufAcc_prune_candidates =
+        ::alpaka::allocBuf<track_candidate_container_types::view, Idx>(devAcc,
+                                                                       1u);
+    auto bufHost_prune_candidates =
+        ::alpaka::allocBuf<track_candidate_container_types::view, Idx>(devHost,
+                                                                       1u);
+    track_candidate_container_types::view* pBufHost_prune_candidates =
+        ::alpaka::getPtrNative(bufHost_prune_candidates);
+    pBufHost_prune_candidates = &prune_candidates;
+
+    // Copy the pruned candidate buffer to the device
+    ::alpaka::memcpy(queue, bufAcc_prune_candidates, bufHost_prune_candidates);
+    ::alpaka::wait(queue);
 
     if (pBufHost_counter->n_valid_tracks > 0) {
         blocksPerGrid =
@@ -674,11 +708,11 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
             threadsPerBlock;
         workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
-        // ::alpaka::exec<Acc>(queue, workDiv, PruneTracksKernel{},
-        //                     track_candidates_buffer,
-        //                     vecmem::get_data(valid_indices_buffer),
-        //                     prune_candidates_buffer);
-        // ::alpaka::wait(queue);
+        ::alpaka::exec<Acc>(queue, workDiv, PruneTracksKernel{},
+                            ::alpaka::getPtrNative(bufAcc_candidates),
+                            vecmem::get_data(valid_indices_buffer),
+                            ::alpaka::getPtrNative(bufAcc_prune_candidates));
+        ::alpaka::wait(queue);
     }
 
     return prune_candidates_buffer;
@@ -702,9 +736,5 @@ namespace alpaka {
 template <>
 struct IsKernelArgumentTriviallyCopyable<
     traccc::measurement_collection_types::const_device> : std::true_type {};
-
-template <>
-struct IsKernelArgumentTriviallyCopyable<
-    traccc::track_candidate_container_types::buffer> : std::true_type {};
 
 }  // namespace alpaka

@@ -37,7 +37,7 @@ namespace traccc::device {
 /// @param[out] n_out_params      The number of output parameters
 ///
 template <typename propagator_t, typename bfield_t, typename config_t>
-TRACCC_DEVICE inline void propagate_to_next_surface(
+TRACCC_HOST_DEVICE inline void propagate_to_next_surface(
     std::size_t globalIndex, const config_t cfg,
     typename propagator_t::detector_type::view_type det_data,
     bfield_t field_data,

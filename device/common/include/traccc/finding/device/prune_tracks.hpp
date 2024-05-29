@@ -20,7 +20,7 @@ namespace traccc::device {
 /// @param[in] track_candidates_view  Track candidate container view
 /// @param[in] valid_indices_view   Valid indices meeting criteria
 /// @param[out] prune_candidates_view  Track candidate container view
-TRACCC_DEVICE inline void prune_tracks(
+TRACCC_HOST_DEVICE inline void prune_tracks(
     std::size_t globalIndex,
     track_candidate_container_types::const_view track_candidates_view,
     vecmem::data::vector_view<const unsigned int> valid_indices_view,

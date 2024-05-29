@@ -14,7 +14,7 @@ namespace traccc::device {
 
 /// Function to add a dummy link in case of a hole
 
-TRACCC_DEVICE inline void add_links_for_holes(
+TRACCC_HOST_DEVICE inline void add_links_for_holes(
     std::size_t globalIndex,
     vecmem::data::vector_view<const unsigned int> n_candidates_view,
     bound_track_parameters_collection_types::const_view in_params_view,

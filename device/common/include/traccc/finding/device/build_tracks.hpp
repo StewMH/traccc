@@ -29,7 +29,7 @@ namespace traccc::device {
 /// @param[out] n_valid_tracks       The number of valid tracks meeting criteria
 
 template <typename config_t>
-TRACCC_DEVICE inline void build_tracks(
+TRACCC_HOST_DEVICE inline void build_tracks(
     std::size_t globalIndex, const config_t cfg,
     measurement_collection_types::const_view measurements_view,
     bound_track_parameters_collection_types::const_view seeds_view,
