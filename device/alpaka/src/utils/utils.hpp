@@ -31,8 +31,10 @@ using Host = ::alpaka::DevCpu;
 using Queue = ::alpaka::Queue<Acc, ::alpaka::Blocking>;
 
 static constexpr std::size_t warpSize =
-#if defined(ALPAKA_ACC_GPU_CUDA_ENABLED) || defined(ALPAKA_ACC_GPU_HIP_ENABLED)
+#if defined(ALPAKA_ACC_GPU_CUDA_ENABLED)
     32;
+#elif defined(ALPAKA_ACC_GPU_HIP_ENABLED)
+    64;
 #else
     4;
 #endif

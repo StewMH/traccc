@@ -248,9 +248,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
     auto devHost = ::alpaka::getDevByIdx(::alpaka::Platform<Host>{}, 0u);
     auto devAcc = ::alpaka::getDevByIdx(::alpaka::Platform<Acc>{}, 0u);
     auto queue = Queue{devAcc};
-    auto const deviceProperties = ::alpaka::getAccDevProps<Acc>(devAcc);
-    auto maxThreads = deviceProperties.m_blockThreadExtentMax[0];
-    auto threadsPerBlock = maxThreads;
+    auto threadsPerBlock = warpSize * 2;
 
     // Copy setup
     m_copy.setup(seeds_buffer);
@@ -263,7 +261,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
 #endif
 
     // Get number of seeds
-    const auto n_seeds = m_copy.get_size(seeds_buffer);
+    const unsigned int n_seeds = m_copy.get_size(seeds_buffer);
 
     // Prepare input parameters with seeds
     bound_track_parameters_collection_types::buffer in_params_buffer(n_seeds,
@@ -308,6 +306,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
         ::alpaka::getPtrNative(bufHost_counter);
     ::alpaka::memset(queue, bufHost_counter, 0);
     ::alpaka::memcpy(queue, bufAcc_counter, bufHost_counter);
+    ::alpaka::wait(queue);
 
     /*****************************************************************
      * Measurement Operations
@@ -378,6 +377,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
 
         // Reset the global counter
         ::alpaka::memset(queue, bufAcc_counter, 0);
+        ::alpaka::wait(queue);
 
         /*****************************************************************
          * Kernel2: Apply material interaction
@@ -658,6 +658,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
 
     // Copy the track candidate buffer to the device
     ::alpaka::memcpy(queue, bufAcc_candidates, bufHost_candidates);
+    ::alpaka::memcpy(queue, bufAcc_const_candidates, bufHost_const_candidates);
     ::alpaka::wait(queue);
 
     // Create buffer for valid indices
@@ -669,9 +670,6 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
     if (n_tips_total > 0) {
         blocksPerGrid = (n_tips_total + threadsPerBlock - 1) / threadsPerBlock;
         workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
-
-        // ::alpaka::exec<Acc>(queue, workDiv, TestKernel{},
-        // ::alpaka::getPtrNative(bufAcc_candidates));
 
         ::alpaka::exec<Acc>(queue, workDiv, BuildTracksKernel<config_type>{},
                             m_cfg, measurements, vecmem::get_data(seeds_buffer),
