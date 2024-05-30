@@ -45,7 +45,7 @@ vecmem::data::vector_buffer<device::prefix_sum_element_t> make_prefix_sum_buff(
     // Setup Alpaka
     auto const deviceProperties = ::alpaka::getAccDevProps<Acc>(
         ::alpaka::getDevByIdx(::alpaka::Platform<Acc>{}, 0u));
-    auto const threadsPerBlock = deviceProperties.m_blockThreadExtentMax[0];
+    auto const threadsPerBlock = warpSize;
 
     // Fixed number of threads per block.
     auto const blocksPerGrid =

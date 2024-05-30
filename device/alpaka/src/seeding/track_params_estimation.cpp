@@ -54,8 +54,7 @@ track_params_estimation::output_type track_params_estimation::operator()(
 
     auto devAcc = ::alpaka::getDevByIdx(::alpaka::Platform<Acc>{}, 0u);
     auto queue = Queue{devAcc};
-    auto const deviceProperties = ::alpaka::getAccDevProps<Acc>(devAcc);
-    auto const threadsPerBlock = deviceProperties.m_blockThreadExtentMax[0];
+    auto const threadsPerBlock = warpSize * 2;
 
     auto blocksPerGrid = (seeds_size + threadsPerBlock - 1) / threadsPerBlock;
     auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);

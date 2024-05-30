@@ -93,8 +93,8 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
     using host_fitter_type =
         traccc::kalman_fitter<rk_stepper_type, host_navigator_type>;
     using device_navigator_type = detray::navigator<const device_detector_type>;
-    using device_fitter_type =
-        traccc::kalman_fitter<rk_stepper_type, device_navigator_type>;
+    // using device_fitter_type =
+    //     traccc::kalman_fitter<rk_stepper_type, device_navigator_type>;
 
 #if defined(ALPAKA_ACC_GPU_CUDA_ENABLED)
     vecmem::cuda::copy copy;
