@@ -7,6 +7,7 @@
 
 // Project include(s).
 #include "traccc/alpaka/finding/finding_algorithm.hpp"
+#include "traccc/alpaka/fitting/fitting_algorithm.hpp"
 #include "traccc/alpaka/seeding/seeding_algorithm.hpp"
 #include "traccc/alpaka/seeding/track_params_estimation.hpp"
 #include "traccc/definitions/common.hpp"
@@ -93,8 +94,8 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
     using host_fitter_type =
         traccc::kalman_fitter<rk_stepper_type, host_navigator_type>;
     using device_navigator_type = detray::navigator<const device_detector_type>;
-    // using device_fitter_type =
-    //     traccc::kalman_fitter<rk_stepper_type, device_navigator_type>;
+    using device_fitter_type =
+        traccc::kalman_fitter<rk_stepper_type, device_navigator_type>;
 
 #if defined(ALPAKA_ACC_GPU_CUDA_ENABLED)
     vecmem::cuda::copy copy;
@@ -120,8 +121,8 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
         traccc::seeding_performance_writer::config{});
     traccc::finding_performance_writer find_performance_writer(
         traccc::finding_performance_writer::config{});
-    // traccc::fitting_performance_writer fit_performance_writer(
-    //     traccc::fitting_performance_writer::config{});
+    traccc::fitting_performance_writer fit_performance_writer(
+        traccc::fitting_performance_writer::config{});
 
     traccc::nseed_performance_writer nsd_performance_writer(
         "nseed_performance_",
@@ -140,8 +141,8 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
     uint64_t n_seeds_alpaka = 0;
     uint64_t n_found_tracks = 0;
     uint64_t n_found_tracks_alpaka = 0;
-    // uint64_t n_fitted_tracks = 0;
-    // uint64_t n_fitted_tracks_alpaka = 0;
+    uint64_t n_fitted_tracks = 0;
+    uint64_t n_fitted_tracks_alpaka = 0;
 
     /*****************************
      * Build a geometry
@@ -220,8 +221,8 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
     fit_cfg.propagation = propagation_opts.config;
 
     traccc::fitting_algorithm<host_fitter_type> host_fitting(fit_cfg);
-    // traccc::cuda::fitting_algorithm<device_fitter_type> device_fitting(
-    //     fit_cfg, mr, async_copy, stream);
+    traccc::alpaka::fitting_algorithm<device_fitter_type> device_fitting(
+        fit_cfg, mr, copy);
 
     traccc::performance::timing_info elapsedTimes;
 
@@ -247,9 +248,9 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
             track_candidates_alpaka_buffer{{{}, *(mr.host)},
                                            {{}, *(mr.host), mr.host}};
 
-        // traccc::track_state_container_types::buffer
-        // track_states_alpaka_buffer{
-        //     {{}, *(mr.host)}, {{}, *(mr.host), mr.host}};
+        traccc::track_state_container_types::buffer
+        track_states_alpaka_buffer{
+            {{}, *(mr.host)}, {{}, *(mr.host), mr.host}};
 
         {  // Start measuring wall time
             traccc::performance::timer wall_t("Wall time", elapsedTimes);
@@ -360,6 +361,25 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
                                                 measurements_per_event, params);
             }
 
+            /*------------------------
+               Track Fitting with KF
+              ------------------------*/
+
+            {
+                traccc::performance::timer t("Track fitting with KF (alpaka)",
+                                             elapsedTimes);
+
+                track_states_alpaka_buffer =
+                    device_fitting(det_view, field, navigation_buffer,
+                                   track_candidates_alpaka_buffer);
+            }
+
+            if (accelerator_opts.compare_with_cpu) {
+                traccc::performance::timer t("Track fitting with KF (cpu)",
+                                             elapsedTimes);
+                track_states = host_fitting(host_det, field, track_candidates);
+            }
+
         }  // Stop measuring wall time
 
         /*----------------------------------
@@ -375,6 +395,10 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
         // Copy track candidates from device to host
         traccc::track_candidate_container_types::host track_candidates_alpaka =
             track_candidate_d2h(track_candidates_alpaka_buffer);
+
+        // Copy track states from device to host
+        traccc::track_state_container_types::host track_states_alpaka =
+            track_state_d2h(track_states_alpaka_buffer);
 
         if (accelerator_opts.compare_with_cpu) {
             // Show which event we are currently presenting the results for.
@@ -424,6 +448,8 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
         n_seeds += seeds.size();
         n_found_tracks_alpaka += track_candidates_alpaka.size();
         n_found_tracks += track_candidates.size();
+        n_fitted_tracks_alpaka += track_states_alpaka.size();
+        n_fitted_tracks += track_states.size();
 
         /*------------
           Writer
@@ -440,12 +466,24 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
 
             find_performance_writer.write(
                 traccc::get_data(track_candidates_alpaka), evt_map);
+
+            for (unsigned int i = 0; i < track_states_alpaka.size(); i++) {
+                const auto& trk_states_per_track =
+                    track_states_alpaka.at(i).items;
+
+                const auto& fit_res = track_states_alpaka[i].header;
+
+                fit_performance_writer.write(trk_states_per_track, fit_res,
+                                             host_det, evt_map);
+            }
         }
     }
 
     if (performance_opts.run) {
         sd_performance_writer.finalize();
         nsd_performance_writer.finalize();
+        find_performance_writer.finalize();
+        fit_performance_writer.finalize();
 
         std::cout << nsd_performance_writer.generate_report_str();
     }
@@ -459,6 +497,10 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
     std::cout << "- created  (cpu) " << n_found_tracks << " found tracks"
               << std::endl;
     std::cout << "- created (alpaka) " << n_found_tracks_alpaka << " found tracks"
+              << std::endl;
+    std::cout << "- created  (cpu) " << n_fitted_tracks << " fitted tracks"
+              << std::endl;
+    std::cout << "- created (alpaka) " << n_fitted_tracks_alpaka << " fitted tracks"
               << std::endl;
     std::cout << "==>Elapsed times...\n" << elapsedTimes << std::endl;
 
