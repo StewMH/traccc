@@ -726,6 +726,9 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
         ::alpaka::wait(queue);
     }
 
+    // Copy the pruned candidate buffer to the host
+    ::alpaka::memcpy(queue, bufHost_prune_candidates, bufAcc_prune_candidates);
+
     return prune_candidates_buffer;
 }
 

@@ -55,6 +55,9 @@ traccc_add_alpaka_library( traccc_alpaka alpaka TYPE SHARED
   # Finding
   "include/traccc/alpaka/finding/finding_algorithm.hpp"
   "src/finding/finding_algorithm.cpp"
+  # Fitting
+  "include/traccc/alpaka/fitting/fitting_algorithm.hpp"
+  "src/fitting/fitting_algorithm.cpp"
 )
 
 target_link_libraries(traccc_alpaka PUBLIC ${PUBLIC_LIBRARIES} PRIVATE ${PRIVATE_LIBRARIES})
