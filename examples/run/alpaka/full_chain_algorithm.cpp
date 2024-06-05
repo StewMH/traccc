@@ -1,6 +1,6 @@
 /** TRACCC library, part of the ACTS project (R&D line)
  *
- * (c) 2023 CERN for the benefit of the ACTS project
+ * (c) 2023-2024 CERN for the benefit of the ACTS project
  *
  * Mozilla Public License Version 2.0
  */
@@ -33,9 +33,9 @@ full_chain_algorithm::full_chain_algorithm(
 #else
       m_device_mr(host_mr),
 #endif
+      m_copy(),
       m_cached_device_mr(
           std::make_unique<vecmem::binary_page_memory_resource>(m_device_mr)),
-      m_copy(),
       m_field_vec{0.f, 0.f, finder_config.bFieldInZ},
       m_field(detray::bfield::create_const_field(m_field_vec)),
       m_detector(detector),
@@ -82,9 +82,9 @@ full_chain_algorithm::full_chain_algorithm(const full_chain_algorithm& parent)
 #else
       m_device_mr(parent.m_host_mr),
 #endif
+      m_copy(),
       m_cached_device_mr(
           std::make_unique<vecmem::binary_page_memory_resource>(m_device_mr)),
-      m_copy(),
       m_field_vec(parent.m_field_vec),
       m_field(parent.m_field),
       m_detector(parent.m_detector),
