@@ -31,14 +31,15 @@ struct FitTrackKernel {
         const typename fitter_t::config_type cfg,
         vecmem::data::jagged_vector_view<typename fitter_t::intersection_type>
             nav_candidates_buffer,
-        track_candidate_container_types::const_view* track_candidates_view,
-        track_state_container_types::view* track_states_view) const {
+        track_candidate_container_types::const_view track_candidates_view,
+        track_state_container_types::view track_states_view) const {
 
         int globalThreadIdx =
             ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
+
         device::fit<fitter_t>(globalThreadIdx, det_data, field_data, cfg,
-                              nav_candidates_buffer, *track_candidates_view,
-                              *track_states_view);
+                              nav_candidates_buffer, track_candidates_view,
+                              track_states_view);
     }
 };
 
@@ -82,29 +83,6 @@ track_state_container_types::buffer fitting_algorithm<fitter_t>::operator()(
     m_copy.setup(track_states_buffer.items);
     m_copy.setup(navigation_buffer);
 
-    // Wrap the buffers in alpaka buffers
-    auto bufAcc_const_candidates =
-        ::alpaka::allocBuf<track_candidate_container_types::const_view, Idx>(
-            devAcc, 1u);
-    auto bufHost_const_candidates =
-        ::alpaka::allocBuf<track_candidate_container_types::const_view, Idx>(
-            devHost, 1u);
-    const track_candidate_container_types::const_view* pBufHost_const_candidates =
-        ::alpaka::getPtrNative(bufHost_const_candidates);
-    pBufHost_const_candidates = &track_candidates_view;
-
-    auto bufAcc_states =
-        ::alpaka::allocBuf<track_state_container_types::view, Idx>(devAcc, 1u);
-    auto bufHost_states =
-        ::alpaka::allocBuf<track_state_container_types::view, Idx>(devHost, 1u);
-    track_state_container_types::view* pBufHost_states =
-        ::alpaka::getPtrNative(bufHost_states);
-    pBufHost_states = &track_states_view;
-
-    ::alpaka::memcpy(queue, bufAcc_const_candidates, bufHost_const_candidates);
-    ::alpaka::memcpy(queue, bufAcc_states, bufHost_states);
-    ::alpaka::wait(queue);
-
     // Calculate the number of threads and thread blocks to run the track
     // fitting
     if (n_tracks > 0) {
@@ -113,16 +91,14 @@ track_state_container_types::buffer fitting_algorithm<fitter_t>::operator()(
         auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
         // Run the track fitting
-        ::alpaka::exec<Acc>(queue, workDiv, FitTrackKernel<fitter_t, typename fitter_t::detector_type::view_type>{},
-                            det_view, field_view, m_cfg,
-                            navigation_buffer,
-                            ::alpaka::getPtrNative(bufAcc_const_candidates),
-                            ::alpaka::getPtrNative(bufAcc_states));
+        ::alpaka::exec<Acc>(
+            queue, workDiv,
+            FitTrackKernel<fitter_t,
+                           typename fitter_t::detector_type::view_type>{},
+            det_view, field_view, m_cfg, navigation_buffer,
+            track_candidates_view, track_states_view);
         ::alpaka::wait(queue);
     }
-
-    // Copy the results back to the host
-    ::alpaka::memcpy(queue, bufHost_states, bufAcc_states);
 
     return track_states_buffer;
 }

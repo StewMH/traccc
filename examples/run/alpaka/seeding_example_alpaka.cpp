@@ -248,8 +248,7 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
             track_candidates_alpaka_buffer{{{}, *(mr.host)},
                                            {{}, *(mr.host), mr.host}};
 
-        traccc::track_state_container_types::buffer
-        track_states_alpaka_buffer{
+        traccc::track_state_container_types::buffer track_states_alpaka_buffer{
             {{}, *(mr.host)}, {{}, *(mr.host), mr.host}};
 
         {  // Start measuring wall time
@@ -496,12 +495,12 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
               << std::endl;
     std::cout << "- created  (cpu) " << n_found_tracks << " found tracks"
               << std::endl;
-    std::cout << "- created (alpaka) " << n_found_tracks_alpaka << " found tracks"
-              << std::endl;
+    std::cout << "- created (alpaka) " << n_found_tracks_alpaka
+              << " found tracks" << std::endl;
     std::cout << "- created  (cpu) " << n_fitted_tracks << " fitted tracks"
               << std::endl;
-    std::cout << "- created (alpaka) " << n_fitted_tracks_alpaka << " fitted tracks"
-              << std::endl;
+    std::cout << "- created (alpaka) " << n_fitted_tracks_alpaka
+              << " fitted tracks" << std::endl;
     std::cout << "==>Elapsed times...\n" << elapsedTimes << std::endl;
 
     return 0;

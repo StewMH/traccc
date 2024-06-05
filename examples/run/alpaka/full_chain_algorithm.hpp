@@ -20,7 +20,6 @@
 #include "traccc/fitting/kalman_filter/kalman_fitter.hpp"
 #include "traccc/utils/algorithm.hpp"
 
-
 // Detray include(s).
 #include "detray/core/detector.hpp"
 #include "detray/detectors/bfield.hpp"
