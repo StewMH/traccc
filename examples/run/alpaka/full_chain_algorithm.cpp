@@ -8,10 +8,6 @@
 // Local include(s).
 #include "full_chain_algorithm.hpp"
 
-// Alpaka include(s).
-#include <alpaka/alpaka.hpp>
-#include <alpaka/example/ExampleDefaultAcc.hpp>
-
 // System include(s).
 #include <iostream>
 #include <stdexcept>
@@ -58,14 +54,6 @@ full_chain_algorithm::full_chain_algorithm(
       m_filter_config(filter_config),
       m_finding_config(finding_config),
       m_fitting_config(fitting_config) {
-
-    // Tell the user what device is being used.
-    using Acc = ::alpaka::ExampleDefaultAcc<::alpaka::DimInt<1>, uint32_t>;
-    int device = 0;
-    auto devAcc = ::alpaka::getDevByIdx(::alpaka::Platform<Acc>{}, 0u);
-    auto const props = ::alpaka::getAccDevProps<Acc>(devAcc);
-    std::cout << "Using Alpaka device: " << ::alpaka::getName(devAcc)
-              << " [id: " << device << "] " << std::endl;
 
     // Copy the detector to the device.
     if (m_detector != nullptr) {
