@@ -89,8 +89,8 @@ int seq_run(const traccc::opts::detector& detector_opts,
 #elif ALPAKA_ACC_GPU_HIP_ENABLED
     vecmem::hip::copy copy;
     vecmem::hip::host_memory_resource hip_host_mr;
-    vecmem::hip::device_memory_resource hip_device_mr;
-    traccc::memory_resource mr{hip_device_mr, &hip_host_mr};
+    vecmem::hip::device_memory_resource device_mr;
+    traccc::memory_resource mr{device_mr, &hip_host_mr};
 #else
     vecmem::copy copy;
     traccc::memory_resource mr{host_mr, &host_mr};

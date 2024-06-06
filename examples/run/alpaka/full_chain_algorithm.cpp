@@ -55,6 +55,8 @@ full_chain_algorithm::full_chain_algorithm(
       m_finding_config(finding_config),
       m_fitting_config(fitting_config) {
 
+    traccc::alpaka::get_device_info();
+
     // Copy the detector to the device.
     if (m_detector != nullptr) {
         m_device_detector = detray::get_buffer(detray::get_data(*m_detector),
