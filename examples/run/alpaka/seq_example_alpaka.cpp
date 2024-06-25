@@ -172,23 +172,13 @@ int seq_run(const traccc::opts::detector& detector_opts,
         traccc::kalman_fitter<stepper_type, device_navigator_type>>;
 
     // Algorithm configuration(s).
-    host_finding_algorithm::config_type finding_cfg;
-    finding_cfg.min_track_candidates_per_track =
-        finding_opts.track_candidates_range[0];
-    finding_cfg.max_track_candidates_per_track =
-        finding_opts.track_candidates_range[1];
-    finding_cfg.min_step_length_for_next_surface =
-        finding_opts.min_step_length_for_next_surface;
-    finding_cfg.max_step_counts_for_next_surface =
-        finding_opts.max_step_counts_for_next_surface;
-    finding_cfg.chi2_max = finding_opts.chi2_max;
-    finding_cfg.max_num_branches_per_seed = finding_opts.nmax_per_seed;
-    finding_cfg.max_num_skipping_per_cand =
-        finding_opts.max_num_skipping_per_cand;
-    finding_cfg.propagation = propagation_opts.config;
+    detray::propagation::config propagation_config(propagation_opts);
+
+    host_finding_algorithm::config_type finding_cfg(finding_opts);
+    finding_cfg.propagation = propagation_config;
 
     host_fitting_algorithm::config_type fitting_cfg;
-    fitting_cfg.propagation = propagation_opts.config;
+    fitting_cfg.propagation = propagation_config;
 
     // Constant B field for the track finding and fitting
     const traccc::vector3 field_vec = {0.f, 0.f,
@@ -206,7 +196,7 @@ int seq_run(const traccc::opts::detector& detector_opts,
     host_fitting_algorithm fitting_alg(fitting_cfg);
 
     traccc::alpaka::clusterization_algorithm ca_alpaka(
-        mr, copy, clusterization_opts.target_cells_per_partition);
+        mr, copy, clusterization_opts);
     traccc::alpaka::measurement_sorting_algorithm ms_alpaka(copy);
     traccc::alpaka::spacepoint_formation_algorithm sf_alpaka(mr, copy);
     traccc::alpaka::seeding_algorithm sa_alpaka(
