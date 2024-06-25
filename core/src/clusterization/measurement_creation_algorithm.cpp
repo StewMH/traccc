@@ -32,16 +32,6 @@ measurement_creation_algorithm::operator()(
 
     // Process the clusters one-by-one.
     for (std::size_t i = 0; i < clusters.size(); ++i) {
-        // To calculate the mean and variance with high numerical stability
-        // we use a weighted variant of Welford's algorithm. This is a
-        // single-pass online algorithm that works well for large numbers
-        // of samples, as well as samples with very high values.
-        //
-        // To learn more about this algorithm please refer to:
-        // [1] https://doi.org/10.1080/00401706.1962.10490022
-        // [2] The Art of Computer Programming, Donald E. Knuth, second
-        //     edition, chapter 4.2.2.
-
         // Get the cluster.
         cluster_container_types::device::item_vector::const_reference cluster =
             clusters.get_items()[i];
@@ -50,12 +40,11 @@ measurement_creation_algorithm::operator()(
         assert(cluster.empty() == false);
 
         // Get the cell module
-        const unsigned int module_link = cluster.at(0).module_link;
-        const auto &module = modules.at(module_link);
+        const unsigned int mod_link = cluster.at(0).module_link;
+        const auto &mod = modules.at(mod_link);
 
         // Fill measurement from cluster
-        details::fill_measurement(measurements, i, cluster, module,
-                                  module_link);
+        details::fill_measurement(measurements, i, cluster, mod, mod_link);
     }
 
     return result;

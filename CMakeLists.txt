@@ -6,7 +6,7 @@
 
 # Set up the project.
 cmake_minimum_required( VERSION 3.9 )
-project( traccc VERSION 0.11.0 LANGUAGES CXX )
+project( traccc VERSION 0.12.0 LANGUAGES CXX )
 
 # Set up the used C++ standard(s).
 set( CMAKE_CXX_STANDARD 17 CACHE STRING "The (host) C++ standard to use" )
@@ -245,7 +245,7 @@ option( TRACCC_USE_SYSTEM_ACTS
    ${TRACCC_USE_SYSTEM_LIBS} )
 if( TRACCC_SETUP_ACTS )
    if( TRACCC_USE_SYSTEM_ACTS )
-      find_package( Acts REQUIRED )
+      find_package( Acts REQUIRED COMPONENTS PluginJson )
    else()
       add_subdirectory( extern/acts )
    endif()
