@@ -65,9 +65,7 @@ TRACCC_DEVICE void fast_sv_1(
              ++tst) {
             const details::index_t cid = tst * blckDim + tid;
 
-#ifndef ALPAKA_ACC_CPU_B_SEQ_T_SEQ_ENABLED
-            __builtin_assume(adjc[tst] <= 8);
-#endif
+            TRACCC_ASSUME(adjc[tst] <= 8);
             for (unsigned char k = 0; k < adjc[tst]; ++k) {
                 details::index_t q = gf.at(adjv[tst][k]);
 
@@ -84,7 +82,7 @@ TRACCC_DEVICE void fast_sv_1(
          */
         barrier.blockBarrier();
 
-#pragma unroll
+        TRACCC_PRAGMA_UNROLL
         for (details::index_t tst = 0; tst < details::MAX_CELLS_PER_THREAD;
              ++tst) {
             const details::index_t cid = tst * blckDim + tid;
@@ -103,7 +101,7 @@ TRACCC_DEVICE void fast_sv_1(
          */
         barrier.blockBarrier();
 
-#pragma unroll
+        TRACCC_PRAGMA_UNROLL
         for (details::index_t tst = 0; tst < details::MAX_CELLS_PER_THREAD;
              ++tst) {
             const details::index_t cid = tst * blckDim + tid;
@@ -133,7 +131,7 @@ TRACCC_DEVICE inline void ccl_kernel(
     const unsigned int blockId,
     const cell_collection_types::const_view cells_view,
     const cell_module_collection_types::const_view modules_view,
-    const details::index_t max_cells_per_partition,
+    [[maybe_unused]] const details::index_t max_cells_per_partition,
     const details::index_t target_cells_per_partition,
     unsigned int& partition_start, unsigned int& partition_end,
     unsigned int& outi, vecmem::data::vector_view<details::index_t> f_view,
@@ -219,7 +217,7 @@ TRACCC_DEVICE inline void ccl_kernel(
     const details::index_t size = partition_end - partition_start;
     assert(size <= max_cells_per_partition);
 
-#pragma unroll
+    TRACCC_PRAGMA_UNROLL
     for (details::index_t tst = 0; tst < details::MAX_CELLS_PER_THREAD; ++tst) {
         adjc[tst] = 0;
     }
@@ -234,7 +232,7 @@ TRACCC_DEVICE inline void ccl_kernel(
                             adjc[tst], adjv[tst]);
     }
 
-#pragma unroll
+    TRACCC_PRAGMA_UNROLL
     for (details::index_t tst = 0; tst < details::MAX_CELLS_PER_THREAD; ++tst) {
         const details::index_t cid = tst * blckDim + threadId;
         /*

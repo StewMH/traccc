@@ -7,7 +7,7 @@
 # Project include(s).
 include( traccc-alpaka-functions )
 
-set(EXTRA_LIBS "")
+set(EXTRA_LIBS)
 
 if(alpaka_ACC_GPU_CUDA_ENABLE)
   enable_language(CUDA)
