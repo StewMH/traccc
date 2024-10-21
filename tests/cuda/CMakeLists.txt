@@ -42,6 +42,9 @@ traccc_add_test(
     test_array_wrapper.cu
     test_mutex.cu
     test_unique_lock.cu
+    test_sanity_contiguous_on.cu
+    test_sanity_ordered_on.cu
+    test_sort.cu
 
     LINK_LIBRARIES
     CUDA::cudart
@@ -50,7 +53,7 @@ traccc_add_test(
     vecmem::cuda
     detray::core
     detray::io
-    detray::utils
+    detray::test_utils
     traccc::core
     traccc::device_common
     traccc::cuda

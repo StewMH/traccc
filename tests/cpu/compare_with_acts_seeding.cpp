@@ -6,7 +6,6 @@
  */
 
 // io
-#include "traccc/io/read_geometry.hpp"
 #include "traccc/io/read_spacepoints.hpp"
 
 // algorithms
@@ -79,22 +78,22 @@ TEST_P(CompareWithActsSeedingTests, Run) {
 
     // Seeding Config
     traccc::seedfinder_config traccc_config;
+    traccc_config.zMin = -1186.f * traccc::unit<float>::mm;
+    traccc_config.zMax = 1186.f * traccc::unit<float>::mm;
+    traccc_config.cotThetaMax = 7.40627f;
+    traccc_config.deltaRMin = 1.f * traccc::unit<float>::mm;
+    traccc_config.deltaRMax = 60.f * traccc::unit<float>::mm;
+    traccc_config.sigmaScattering = 1.0f;
+
     traccc::spacepoint_grid_config grid_config(traccc_config);
 
     // Declare algorithms
     traccc::spacepoint_binning sb(traccc_config, grid_config, host_mr);
     traccc::seed_finding sf(traccc_config, traccc::seedfilter_config());
 
-    // Read the surface transforms
-    auto [surface_transforms, _] = traccc::io::read_geometry(detector_file);
-
     // Read the hits from the relevant event file
-    traccc::io::spacepoint_reader_output reader_output(&host_mr);
-    traccc::io::read_spacepoints(reader_output, event, hits_dir,
-                                 surface_transforms, traccc::data_format::csv);
-
-    traccc::spacepoint_collection_types::host& spacepoints_per_event =
-        reader_output.spacepoints;
+    traccc::spacepoint_collection_types::host spacepoints_per_event{&host_mr};
+    traccc::io::read_spacepoints(spacepoints_per_event, event, hits_dir);
 
     /*--------------------------------
       TRACCC seeding
@@ -142,7 +141,7 @@ TEST_P(CompareWithActsSeedingTests, Run) {
     acts_config.rMin = traccc_config.rMin;
     acts_config.rMax = traccc_config.rMax;
     acts_config.rMinMiddle = 0.f;
-    acts_config.rMaxMiddle = std::numeric_limits<traccc::scalar>::max();
+    acts_config.rMaxMiddle = std::numeric_limits<float>::max();
     acts_config.deltaRMin = traccc_config.deltaRMin;
     acts_config.deltaRMinTopSP = traccc_config.deltaRMin;
     acts_config.deltaRMinBottomSP = traccc_config.deltaRMin;
@@ -272,7 +271,8 @@ TEST_P(CompareWithActsSeedingTests, Run) {
         std::floor(rRangeSPExtent.max(Acts::binR) / 2) * 2);
 
     const Acts::Range1D<float> rMiddleSPRange(
-        std::floor(rRangeSPExtent.min(Acts::binR) / 2) * 2 +
+        std::floor(static_cast<float>(rRangeSPExtent.min(Acts::binR)) / 2.f) *
+                2.f +
             acts_config.deltaRMiddleMinSPRange,
         up - acts_config.deltaRMiddleMaxSPRange);
 

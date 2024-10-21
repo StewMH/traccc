@@ -18,10 +18,10 @@ namespace traccc {
 template <typename scalar_t>
 using unit = detray::unit<scalar_t>;
 
-// epsilon for float variables
-constexpr scalar float_epsilon = 1e-5;
+template <typename scalar_t>
+using constant = detray::constant<scalar_t>;
 
-// pion mass for track parameter estimation
-constexpr scalar PION_MASS_MEV = 139.57018 * unit<scalar>::MeV;
+// epsilon for float variables
+constexpr scalar float_epsilon = 1e-5f;
 
 }  // namespace traccc

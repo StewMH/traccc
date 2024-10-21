@@ -12,8 +12,8 @@
 
 // Detray include(s).
 #include "detray/detectors/bfield.hpp"
-#include "detray/detectors/create_wire_chamber.hpp"
 #include "detray/io/frontend/detector_writer.hpp"
+#include "detray/test/utils/detectors/create_wire_chamber.hpp"
 
 // System include(s)
 #include <array>
@@ -48,12 +48,12 @@ class KalmanFittingWireChamberTests : public KalmanFittingTests {
 
     /// Standard deviations for seed track parameters
     static constexpr std::array<scalar, e_bound_size> stddevs = {
-        0.01 * detray::unit<scalar>::mm,
-        0.01 * detray::unit<scalar>::mm,
-        0.001,
-        0.001,
-        0.001 / detray::unit<scalar>::GeV,
-        0.01 * detray::unit<scalar>::ns};
+        0.01f * detray::unit<scalar>::mm,
+        0.01f * detray::unit<scalar>::mm,
+        0.001f,
+        0.001f,
+        0.001f / detray::unit<scalar>::GeV,
+        0.01f * detray::unit<scalar>::ns};
 
     void consistency_tests(const track_state_collection_types::host&
                                track_states_per_track) const {

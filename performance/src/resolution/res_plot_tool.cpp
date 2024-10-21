@@ -9,7 +9,7 @@
 #include "res_plot_tool.hpp"
 
 // Detray include(s).
-#include "detray/utils/statistics.hpp"
+#include "detray/test/utils/statistics.hpp"
 
 // ROOT include(s).
 #ifdef TRACCC_HAVE_ROOT
@@ -113,8 +113,7 @@ void res_plot_tool::fill(res_plot_cache& cache,
         scalar pull = 0.f;
 
         if (idx < e_bound_size) {
-            residual = getter::element(fit_param.vector(), idx, 0) -
-                       getter::element(truth_param.vector(), idx, 0);
+            residual = fit_param[idx] - truth_param[idx];
             pull = residual /
                    std::sqrt(getter::element(fit_param.covariance(), idx, idx));
         } else if (par_name == "qopT") {
@@ -189,7 +188,7 @@ void res_plot_tool::write(res_plot_cache& cache) const {
             auto res = data->Fit("gaus", "Q0S");
             gaus.GetParameters(&fit_par[0]);
             H->SetBinContent(i + 1, fit_par[2]);
-            sigmas.push_back(gaus.GetParError(2));
+            sigmas.push_back(static_cast<float>(gaus.GetParError(2)));
         }
 
         std::unique_ptr<TGraphErrors> G =

@@ -9,6 +9,10 @@
 #include "traccc/clusterization/sparse_ccl_algorithm.hpp"
 
 #include "traccc/clusterization/details/sparse_ccl.hpp"
+#include "traccc/sanity/contiguous_on.hpp"
+#include "traccc/sanity/ordered_on.hpp"
+#include "traccc/utils/projections.hpp"
+#include "traccc/utils/relations.hpp"
 
 // VecMem include(s).
 #include <vecmem/containers/device_vector.hpp>
@@ -20,10 +24,16 @@ sparse_ccl_algorithm::sparse_ccl_algorithm(vecmem::memory_resource& mr)
     : m_mr(mr) {}
 
 sparse_ccl_algorithm::output_type sparse_ccl_algorithm::operator()(
-    const cell_collection_types::const_view& cells_view) const {
+    const edm::silicon_cell_collection::const_view& cells_view) const {
+
+    // Construct the device view of the cells.
+    const edm::silicon_cell_collection::const_device cells{cells_view};
+
+    // Run some sanity checks on it.
+    assert(is_contiguous_on(cell_module_projection(), cells));
+    assert(is_ordered_on(channel0_major_cell_order_relation(), cells));
 
     // Run SparseCCL to fill CCL indices.
-    const cell_collection_types::const_device cells{cells_view};
     vecmem::vector<unsigned int> cluster_indices{cells.size(), &(m_mr.get())};
     vecmem::device_vector<unsigned int> cluster_indices_device{
         vecmem::get_data(cluster_indices)};
@@ -31,11 +41,13 @@ sparse_ccl_algorithm::output_type sparse_ccl_algorithm::operator()(
         details::sparse_ccl(cells, cluster_indices_device);
 
     // Create the result container.
-    output_type clusters(num_clusters, &(m_mr.get()));
+    output_type clusters{m_mr.get()};
+    clusters.resize(num_clusters);
 
     // Add cells to their clusters.
-    for (std::size_t i = 0; i < cluster_indices.size(); ++i) {
-        clusters.get_items()[cluster_indices[i]].push_back(cells[i]);
+    for (std::size_t cell_idx = 0; cell_idx < cluster_indices.size();
+         ++cell_idx) {
+        clusters.cell_indices()[cluster_indices[cell_idx]].push_back(cell_idx);
     }
 
     // Return the clusters.

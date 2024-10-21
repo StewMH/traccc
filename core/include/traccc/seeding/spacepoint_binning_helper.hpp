@@ -82,7 +82,7 @@ inline std::pair<detray::axis2::circular<>, detray::axis2::regular<>> get_axes(
 
         // divide 2pi by angle delta to get number of phi-bins
         // size is always 2pi even for regions of interest
-        phiBins = std::ceil(2 * M_PI / deltaPhi);
+        phiBins = std::llround(2 * M_PI / deltaPhi + 0.5);
         // need to scale the number of phi bins accordingly to the number of
         // consecutive phi bins in the seed making step.
         // Each individual bin should be approximately a fraction (depending on
@@ -99,7 +99,8 @@ inline std::pair<detray::axis2::circular<>, detray::axis2::regular<>> get_axes(
 
     scalar zBinSize = grid_config.cotThetaMax * grid_config.deltaRMax;
     detray::dindex zBins = std::max(
-        1, (int)std::floor((grid_config.zMax - grid_config.zMin) / zBinSize));
+        1, static_cast<int>(
+               std::floor((grid_config.zMax - grid_config.zMin) / zBinSize)));
 
     detray::axis2::regular m_z_axis{zBins, grid_config.zMin, grid_config.zMax,
                                     mr};
@@ -116,8 +117,8 @@ inline TRACCC_HOST_DEVICE size_t is_valid_sp(const seedfinder_config& config,
     if (spPhi > config.phiMax || spPhi < config.phiMin) {
         return detray::detail::invalid_value<size_t>();
     }
-    size_t r_index = getter::perp(
-        vector2{sp.x() - config.beamPos[0], sp.y() - config.beamPos[1]});
+    size_t r_index = static_cast<size_t>(getter::perp(
+        vector2{sp.x() - config.beamPos[0], sp.y() - config.beamPos[1]}));
 
     if (r_index < config.get_num_rbins()) {
         return r_index;

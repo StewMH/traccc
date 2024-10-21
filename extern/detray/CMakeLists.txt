@@ -18,24 +18,50 @@ message( STATUS "Building Detray as part of the TRACCC project" )
 
 # Declare where to get Detray from.
 set( TRACCC_DETRAY_SOURCE
-"URL;https://github.com/acts-project/detray/archive/refs/tags/v0.67.0.tar.gz;URL_MD5;e874ea4299bdfa55b74df1ad71fae066"
+"URL;https://github.com/acts-project/detray/archive/refs/tags/v0.79.0.tar.gz;URL_MD5;b2eb38b7a58c55f41aa5e295c21e1aeb"
    CACHE STRING "Source for Detray, when built as part of this project" )
 
 mark_as_advanced( TRACCC_DETRAY_SOURCE )
-FetchContent_Declare( Detray ${TRACCC_DETRAY_SOURCE} )
+
+# Mark the import as a system library on modern CMake versions
+if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.25.0)
+   set(TRACCC_DETRAY_SOURCE_FULL "${TRACCC_DETRAY_SOURCE};SYSTEM")
+else()
+   set(TRACCC_DETRAY_SOURCE_FULL "${TRACCC_DETRAY_SOURCE}")
+endif()
+mark_as_advanced( TRACCC_DETRAY_SOURCE_FULL )
+
+FetchContent_Declare( Detray ${TRACCC_DETRAY_SOURCE_FULL} )
 
 # Options used in the build of Detray.
 set( DETRAY_CUSTOM_SCALARTYPE "float" CACHE STRING
    "Scalar type to use in the Detray code" )
 
-set( DETRAY_BUILD_TESTING FALSE CACHE BOOL
+set( DETRAY_BUILD_UNITTESTS FALSE CACHE BOOL
    "Turn off the build of the Detray unit tests" )
+set( DETRAY_BUILD_INTEGRATIONTESTS FALSE CACHE BOOL
+   "Turn off the build of the Detray integration tests" )
+set( DETRAY_BUILD_BENCHMARKS FALSE CACHE BOOL
+   "Turn off the build of the Detray benchmarks" )
+set( DETRAY_BUILD_CLI_TOOLS FALSE CACHE BOOL
+   "Turn off the build of the Detray CLI tools" )
 set( DETRAY_BUILD_TUTORIALS FALSE CACHE BOOL
    "Turn off the build of the Detray tutorials" )
 set( DETRAY_EIGEN_PLUGIN TRUE CACHE BOOL
    "Turn on the build of the Detray Eigen code" )
-set( DETRAY_VC_PLUGIN TRUE CACHE BOOL
-   "Turn on the build of the Detray Vc code" )
+set( DETRAY_VC_AOS_PLUGIN TRUE CACHE BOOL
+   "Turn on the build of the Detray Vc AoS code" )
+
+# Needed for 'performance', 'simulation', 'examples', 'tests' and 'benchmarks'
+if( TRACCC_BUILD_IO OR TRACCC_BUILD_EXAMPLES OR (BUILD_TESTING AND TRACCC_BUILD_TESTING) OR TRACCC_BUILD_BENCHMARKS )
+   set( DETRAY_BUILD_TEST_UTILS TRUE CACHE BOOL
+      "Turn on the build of the Detray tests utilities if needed" )
+else()
+   set( DETRAY_BUILD_TEST_UTILS FALSE CACHE BOOL
+      "Turn off the build of the Detray tests utilities" )
+endif()
+set( DETRAY_BUILD_VALIDATION_TOOLS FALSE CACHE BOOL
+   "Turn off the build of the Detray validation tools" )
 
 set( DETRAY_SETUP_VECMEM FALSE CACHE BOOL
    "Do not set up VecMem as part of Detray" )

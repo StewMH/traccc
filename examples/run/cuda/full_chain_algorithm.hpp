@@ -8,17 +8,20 @@
 #pragma once
 
 // Project include(s).
+#include "traccc/clusterization/clustering_config.hpp"
 #include "traccc/cuda/clusterization/clusterization_algorithm.hpp"
 #include "traccc/cuda/clusterization/measurement_sorting_algorithm.hpp"
-#include "traccc/cuda/clusterization/spacepoint_formation_algorithm.hpp"
 #include "traccc/cuda/finding/finding_algorithm.hpp"
 #include "traccc/cuda/fitting/fitting_algorithm.hpp"
 #include "traccc/cuda/seeding/seeding_algorithm.hpp"
+#include "traccc/cuda/seeding/spacepoint_formation_algorithm.hpp"
 #include "traccc/cuda/seeding/track_params_estimation.hpp"
 #include "traccc/cuda/utils/stream.hpp"
-#include "traccc/edm/cell.hpp"
+#include "traccc/edm/silicon_cell_collection.hpp"
 #include "traccc/edm/track_state.hpp"
 #include "traccc/fitting/kalman_filter/kalman_fitter.hpp"
+#include "traccc/geometry/detector.hpp"
+#include "traccc/geometry/silicon_detector_description.hpp"
 #include "traccc/utils/algorithm.hpp"
 
 // Detray include(s).
@@ -46,20 +49,16 @@ namespace traccc::cuda {
 ///
 class full_chain_algorithm
     : public algorithm<vecmem::vector<fitting_result<default_algebra>>(
-          const cell_collection_types::host&,
-          const cell_module_collection_types::host&)> {
+          const edm::silicon_cell_collection::host&)> {
 
     public:
     /// @name Type declaration(s)
     /// @{
 
     /// (Host) Detector type used during track finding and fitting
-    using host_detector_type = detray::detector<detray::default_metadata,
-                                                detray::host_container_types>;
+    using host_detector_type = traccc::default_detector::host;
     /// (Device) Detector type used during track finding and fitting
-    using device_detector_type =
-        detray::detector<detray::default_metadata,
-                         detray::device_container_types>;
+    using device_detector_type = traccc::default_detector::device;
 
     /// Stepper type used by the track finding and fitting algorithms
     using stepper_type =
@@ -68,7 +67,12 @@ class full_chain_algorithm
                            detray::constrained_step<>>;
     /// Navigator type used by the track finding and fitting algorithms
     using navigator_type = detray::navigator<const device_detector_type>;
-
+    /// Spacepoint formation algorithm type
+    using spacepoint_formation_algorithm =
+        traccc::cuda::spacepoint_formation_algorithm<
+            traccc::default_detector::device>;
+    /// Clustering algorithm type
+    using clustering_algorithm = traccc::cuda::clusterization_algorithm;
     /// Track finding algorithm type
     using finding_algorithm =
         traccc::cuda::finding_algorithm<stepper_type, navigator_type>;
@@ -82,16 +86,15 @@ class full_chain_algorithm
     ///
     /// @param mr The memory resource to use for the intermediate and result
     ///           objects
-    /// @param target_cells_per_partition The average number of cells in each
-    /// partition.
     ///
     full_chain_algorithm(vecmem::memory_resource& host_mr,
-                         const unsigned short target_cells_per_partiton,
+                         const clustering_config& clustering_config,
                          const seedfinder_config& finder_config,
                          const spacepoint_grid_config& grid_config,
                          const seedfilter_config& filter_config,
                          const finding_algorithm::config_type& finding_config,
                          const fitting_algorithm::config_type& fitting_config,
+                         const silicon_detector_description::host& det_descr,
                          host_detector_type* detector);
 
     /// Copy constructor
@@ -113,8 +116,7 @@ class full_chain_algorithm
     /// @return The track parameters reconstructed
     ///
     output_type operator()(
-        const cell_collection_types::host& cells,
-        const cell_module_collection_types::host& modules) const override;
+        const edm::silicon_cell_collection::host& cells) const override;
 
     private:
     /// Host memory resource
@@ -133,6 +135,11 @@ class full_chain_algorithm
     /// Constant B field for the track finding and fitting
     detray::bfield::const_field_t m_field;
 
+    /// Detector description
+    std::reference_wrapper<const silicon_detector_description::host>
+        m_det_descr;
+    /// Detector description buffer
+    silicon_detector_description::buffer m_device_det_descr;
     /// Host detector
     host_detector_type* m_detector;
     /// Buffer holding the detector's payload on the device
@@ -143,9 +150,6 @@ class full_chain_algorithm
     /// @name Sub-algorithms used by this full-chain algorithm
     /// @{
 
-    /// The average number of cells in each partition.
-    /// Adapt to different GPUs' capabilities.
-    unsigned short m_target_cells_per_partition;
     /// Clusterization algorithm
     clusterization_algorithm m_clusterization;
     /// Measurement sorting algorithm
@@ -167,6 +171,8 @@ class full_chain_algorithm
     /// @name Algorithm configurations
     /// @{
 
+    /// Configuration for clustering
+    clustering_config m_clustering_config;
     /// Configuration for the seed finding
     seedfinder_config m_finder_config;
     /// Configuration for the spacepoint grid formation

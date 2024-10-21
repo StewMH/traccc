@@ -11,11 +11,11 @@
 #include "kalman_fitting_test.hpp"
 
 // Detray include(s).
-#include "detray/detectors/build_telescope_detector.hpp"
 #include "detray/geometry/mask.hpp"
 #include "detray/geometry/shapes/rectangle2D.hpp"
 #include "detray/io/frontend/detector_writer.hpp"
 #include "detray/navigation/detail/ray.hpp"
+#include "detray/test/utils/detectors/build_telescope_detector.hpp"
 
 namespace traccc {
 
@@ -50,12 +50,12 @@ class KalmanFittingTelescopeTests : public KalmanFittingTests {
 
     /// Standard deviations for seed track parameters
     static constexpr std::array<scalar, e_bound_size> stddevs = {
-        0.03 * detray::unit<scalar>::mm,
-        0.03 * detray::unit<scalar>::mm,
-        0.017,
-        0.017,
-        0.001 / detray::unit<scalar>::GeV,
-        1 * detray::unit<scalar>::ns};
+        0.03f * detray::unit<scalar>::mm,
+        0.03f * detray::unit<scalar>::mm,
+        0.017f,
+        0.017f,
+        0.001f / detray::unit<scalar>::GeV,
+        1.f * detray::unit<scalar>::ns};
 
     void consistency_tests(const track_state_collection_types::host&
                                track_states_per_track) const {

@@ -12,8 +12,8 @@
 
 // Detray include(s).
 #include "detray/detectors/bfield.hpp"
-#include "detray/detectors/build_toy_detector.hpp"
 #include "detray/io/frontend/detector_writer.hpp"
+#include "detray/test/utils/detectors/build_toy_detector.hpp"
 
 // System include(s)
 #include <array>
@@ -45,12 +45,12 @@ class KalmanFittingToyDetectorTests : public KalmanFittingTests {
 
     /// Standard deviations for seed track parameters
     static constexpr std::array<scalar, e_bound_size> stddevs = {
-        0.01 * detray::unit<scalar>::mm,
-        0.01 * detray::unit<scalar>::mm,
-        0.001,
-        0.001,
-        0.01 / detray::unit<scalar>::GeV,
-        0.01 * detray::unit<scalar>::ns};
+        0.01f * detray::unit<scalar>::mm,
+        0.01f * detray::unit<scalar>::mm,
+        0.001f,
+        0.001f,
+        0.001f / detray::unit<scalar>::GeV,
+        0.01f * detray::unit<scalar>::ns};
 
     protected:
     virtual void SetUp() override {

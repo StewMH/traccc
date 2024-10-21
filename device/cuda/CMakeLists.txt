@@ -7,6 +7,9 @@
 # Enable CUDA as a language.
 enable_language( CUDA )
 
+# CMake 3.26 is the first to support C++20 in CUDA.
+cmake_minimum_required( VERSION 3.26 )
+
 # Find the CUDA toolkit
 find_package( CUDAToolkit REQUIRED )
 
@@ -28,6 +31,8 @@ traccc_add_library( traccc_cuda cuda TYPE SHARED
   "src/utils/opaque_stream.cpp"
   "src/utils/utils.hpp"
   "src/utils/utils.cpp"
+  "src/sanity/contiguous_on.cuh"
+  "src/sanity/ordered_on.cuh"
   # Seed finding code.
   "include/traccc/cuda/seeding/track_params_estimation.hpp"
   "src/seeding/track_params_estimation.cu"
@@ -37,15 +42,13 @@ traccc_add_library( traccc_cuda cuda TYPE SHARED
   "src/seeding/seeding_algorithm.cpp"
   "include/traccc/cuda/seeding/spacepoint_binning.hpp"
   "src/seeding/spacepoint_binning.cu"
-  "include/traccc/cuda/seeding/experimental/spacepoint_formation.hpp"
-  "src/seeding/experimental/spacepoint_formation.cu"
+  "include/traccc/cuda/seeding/spacepoint_formation_algorithm.hpp"
+  "src/seeding/spacepoint_formation_algorithm.cu"
   # Clusterization
   "include/traccc/cuda/clusterization/clusterization_algorithm.hpp"
   "src/clusterization/clusterization_algorithm.cu"
   "include/traccc/cuda/clusterization/measurement_sorting_algorithm.hpp"
   "src/clusterization/measurement_sorting_algorithm.cu"
-  "include/traccc/cuda/clusterization/spacepoint_formation_algorithm.hpp"
-  "src/clusterization/spacepoint_formation_algorithm.cu"
   # Finding
   "include/traccc/cuda/finding/finding_algorithm.hpp"
   "src/finding/finding_algorithm.cu"
@@ -86,7 +89,7 @@ endif()
 target_compile_options( traccc_cuda
   PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr> )
 target_link_libraries( traccc_cuda
-  PUBLIC traccc::core detray::core detray::utils vecmem::core covfie::core
+  PUBLIC traccc::core detray::core vecmem::core covfie::core
   PRIVATE CUDA::cudart traccc::Thrust traccc::device_common vecmem::cuda )
 
 # For CUDA 11 turn on separable compilation. This is necessary for using

@@ -7,10 +7,13 @@
 
 // Project include(s).
 #include "traccc/finding/candidate_link.hpp"
+#include "traccc/sanity/contiguous_on.hpp"
+#include "traccc/utils/particle.hpp"
+#include "traccc/utils/projections.hpp"
 
 // detray include(s).
 #include "detray/geometry/barcode.hpp"
-#include "detray/geometry/surface.hpp"
+#include "detray/geometry/tracking_surface.hpp"
 
 // System include
 #include <algorithm>
@@ -28,6 +31,10 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
     /*****************************************************************
      * Measurement Operations
      *****************************************************************/
+
+    // Check contiguity of the measurements
+    assert(
+        host::is_contiguous_on(measurement_module_projection(), measurements));
 
     // Get copy of barcode uniques
     std::vector<measurement> uniques;
@@ -124,18 +131,19 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
              * Material interaction
              *************************/
 
-            // Get intersection at surface
-            const detray::surface sf{det, in_param.surface_link()};
+            // Get surface corresponding to bound params
+            const detray::tracking_surface sf{det, in_param.surface_link()};
 
             const cxt_t ctx{};
 
             // Apply interactor
             typename interactor_type::state interactor_state;
             interactor_type{}.update(
+                ctx,
+                detail::correct_particle_hypothesis(m_cfg.ptc_hypothesis,
+                                                    in_param),
                 in_param, interactor_state,
-                static_cast<int>(detray::navigation::direction::e_forward), sf,
-                std::abs(
-                    sf.cos_angle(ctx, in_param.dir(), in_param.bound_local())));
+                static_cast<int>(detray::navigation::direction::e_forward), sf);
 
             // Get barcode and measurements range on surface
             const auto bcd = in_param.surface_link();
@@ -172,22 +180,18 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                     break;
                 }
 
-                bound_track_parameters bound_param(in_param.surface_link(),
-                                                   in_param.vector(),
-                                                   in_param.covariance());
                 const auto& meas = measurements[item_id];
 
                 track_state<algebra_type> trk_state(meas);
 
-                // Run the Kalman update
-                sf.template visit_mask<gain_matrix_updater<algebra_type>>(
-                    trk_state, bound_param);
+                // Run the Kalman update on a copy of the track parameters
+                bound_track_parameters bound_param(in_param);
+                const bool res =
+                    sf.template visit_mask<gain_matrix_updater<algebra_type>>(
+                        trk_state, bound_param);
 
-                // Get the chi-square
-                const auto chi2 = trk_state.filtered_chi2();
-
-                // Found a good measurement
-                if (chi2 < m_cfg.chi2_max) {
+                // The chi2 from Kalman update should be less than chi2_max
+                if (res && trk_state.filtered_chi2() < m_cfg.chi2_max) {
                     n_branches++;
 
                     links[step].push_back({{previous_step, in_param_id},
@@ -210,10 +214,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                                        orig_param_id,
                                        skip_counter + 1});
 
-                bound_track_parameters bound_param(in_param.surface_link(),
-                                                   in_param.vector(),
-                                                   in_param.covariance());
-                updated_params.push_back(bound_param);
+                updated_params.push_back(in_param);
                 n_branches++;
             }
         }
@@ -243,6 +244,9 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
             const auto& param = updated_params[link_id];
             // Create propagator state
             typename propagator_type::state propagation(param, field, det);
+            propagation.set_particle(detail::correct_particle_hypothesis(
+                m_cfg.ptc_hypothesis, param));
+
             propagation._stepping
                 .template set_constraint<detray::step::constraint::e_accuracy>(
                     m_cfg.propagation.stepping.step_constraint);
@@ -261,7 +265,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
 
             // Propagate to the next surface
             propagator.propagate_sync(propagation,
-                                      std::tie(s0, s1, s2, s3, s4));
+                                      detray::tie(s0, s1, s2, s3, s4));
 
             // If a surface found, add the parameter for the next
             // step
