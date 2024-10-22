@@ -8,10 +8,13 @@
 // Project include(s).
 #include "traccc/alpaka/clusterization/clusterization_algorithm.hpp"
 #include "traccc/alpaka/clusterization/measurement_sorting_algorithm.hpp"
+#include "traccc/alpaka/finding/finding_algorithm.hpp"
+#include "traccc/alpaka/fitting/fitting_algorithm.hpp"
 #include "traccc/alpaka/seeding/seeding_algorithm.hpp"
 #include "traccc/alpaka/seeding/spacepoint_formation_algorithm.hpp"
 #include "traccc/alpaka/seeding/track_params_estimation.hpp"
 #include "traccc/clusterization/clusterization_algorithm.hpp"
+#include "traccc/device/container_d2h_copy_alg.hpp"
 #include "traccc/efficiency/seeding_performance_writer.hpp"
 #include "traccc/finding/finding_algorithm.hpp"
 #include "traccc/fitting/fitting_algorithm.hpp"
@@ -76,51 +79,22 @@ int seq_run(const traccc::opts::detector& detector_opts,
             const traccc::opts::performance& performance_opts,
             const traccc::opts::accelerator& accelerator_opts) {
 
-    // Output stats
-    uint64_t n_cells = 0;
-    uint64_t n_measurements = 0;
-    uint64_t n_measurements_alpaka = 0;
-    uint64_t n_spacepoints = 0;
-    uint64_t n_spacepoints_alpaka = 0;
-    uint64_t n_seeds = 0;
-    uint64_t n_seeds_alpaka = 0;
-    uint64_t n_found_tracks = 0;
-    uint64_t n_found_tracks_alpaka = 0;
-    uint64_t n_fitted_tracks = 0;
-    uint64_t n_fitted_tracks_alpaka = 0;
-
-    // Type definitions
-    using stepper_type =
-        detray::rk_stepper<detray::bfield::const_field_t::view_t,
-                           host_detector_type::algebra_type,
-                           detray::constrained_step<>>;
-    using host_navigator_type = detray::navigator<const host_detector_type>;
-    using device_navigator_type = detray::navigator<const device_detector_type>;
-
-    using host_finding_algorithm =
-        traccc::finding_algorithm<stepper_type, host_navigator_type>;
-    using device_finding_algorithm =
-        traccc::alpaka::finding_algorithm<stepper_type, device_navigator_type>;
-
-    using host_fitting_algorithm = traccc::fitting_algorithm<
-        traccc::kalman_fitter<stepper_type, host_navigator_type>>;
-    using device_fitting_algorithm = traccc::alpaka::fitting_algorithm<
-        traccc::kalman_fitter<stepper_type, device_navigator_type>>;
-
-    // Algorithm configuration(s).
-    detray::propagation::config propagation_config(propagation_opts);
-
-    host_finding_algorithm::config_type finding_cfg(finding_opts);
-    finding_cfg.propagation = propagation_config;
-
-    host_fitting_algorithm::config_type fitting_cfg;
-    fitting_cfg.propagation = propagation_config;
-
-    // Constant B field for the track finding and fitting
-    const traccc::vector3 field_vec = {0.f, 0.f,
-                                       seeding_opts.seedfinder.bFieldInZ};
-    const detray::bfield::const_field_t field =
-        detray::bfield::create_const_field(field_vec);
+    // Memory resources used by the application.
+    vecmem::host_memory_resource host_mr;
+#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
+    vecmem::cuda::copy copy;
+    vecmem::cuda::host_memory_resource cuda_host_mr;
+    vecmem::cuda::device_memory_resource device_mr;
+    traccc::memory_resource mr{device_mr, &cuda_host_mr};
+#elif ALPAKA_ACC_GPU_HIP_ENABLED
+    vecmem::hip::copy copy;
+    vecmem::hip::host_memory_resource hip_host_mr;
+    vecmem::hip::device_memory_resource device_mr;
+    traccc::memory_resource mr{device_mr, &hip_host_mr};
+#else
+    vecmem::copy copy;
+    traccc::memory_resource mr{host_mr, &host_mr};
+#endif
 
     // Construct the detector description object.
     traccc::silicon_detector_description::host host_det_descr{host_mr};
@@ -150,6 +124,19 @@ int seq_run(const traccc::opts::detector& detector_opts,
         device_detector_view = detray::get_data(device_detector);
     }
 
+    // Output stats
+    uint64_t n_cells = 0;
+    uint64_t n_measurements = 0;
+    uint64_t n_measurements_alpaka = 0;
+    uint64_t n_spacepoints = 0;
+    uint64_t n_spacepoints_alpaka = 0;
+    uint64_t n_seeds = 0;
+    uint64_t n_seeds_alpaka = 0;
+    uint64_t n_found_tracks = 0;
+    uint64_t n_found_tracks_alpaka = 0;
+    uint64_t n_fitted_tracks = 0;
+    uint64_t n_fitted_tracks_alpaka = 0;
+
     // Type definitions
     using host_spacepoint_formation_algorithm =
         traccc::host::spacepoint_formation_algorithm<
@@ -157,6 +144,39 @@ int seq_run(const traccc::opts::detector& detector_opts,
     using device_spacepoint_formation_algorithm =
         traccc::alpaka::spacepoint_formation_algorithm<
             traccc::default_detector::device>;
+    using stepper_type =
+        detray::rk_stepper<detray::bfield::const_field_t::view_t,
+                           traccc::default_detector::host::algebra_type,
+                           detray::constrained_step<>>;
+    using host_navigator_type =
+        detray::navigator<const traccc::default_detector::host>;
+    using device_navigator_type =
+        detray::navigator<const traccc::default_detector::device>;
+
+    using host_finding_algorithm =
+        traccc::finding_algorithm<stepper_type, host_navigator_type>;
+    using device_finding_algorithm =
+        traccc::alpaka::finding_algorithm<stepper_type, device_navigator_type>;
+
+    using host_fitting_algorithm = traccc::fitting_algorithm<
+        traccc::kalman_fitter<stepper_type, host_navigator_type>>;
+    using device_fitting_algorithm = traccc::alpaka::fitting_algorithm<
+        traccc::kalman_fitter<stepper_type, device_navigator_type>>;
+
+    // Algorithm configuration(s).
+    detray::propagation::config propagation_config(propagation_opts);
+
+    host_finding_algorithm::config_type finding_cfg(finding_opts);
+    finding_cfg.propagation = propagation_config;
+
+    host_fitting_algorithm::config_type fitting_cfg;
+    fitting_cfg.propagation = propagation_config;
+
+    // Constant B field for the track finding and fitting
+    const traccc::vector3 field_vec = {0.f, 0.f,
+                                       seeding_opts.seedfinder.bFieldInZ};
+    const detray::bfield::const_field_t field =
+        detray::bfield::create_const_field(field_vec);
 
     traccc::host::clusterization_algorithm ca(host_mr);
     host_spacepoint_formation_algorithm sf(host_mr);
@@ -167,8 +187,8 @@ int seq_run(const traccc::opts::detector& detector_opts,
     host_finding_algorithm finding_alg(finding_cfg);
     host_fitting_algorithm fitting_alg(fitting_cfg);
 
-    traccc::alpaka::clusterization_algorithm ca_alpaka(
-        mr, copy, clusterization_opts);
+    traccc::alpaka::clusterization_algorithm ca_alpaka(mr, copy,
+                                                       clusterization_opts);
     traccc::alpaka::measurement_sorting_algorithm ms_alpaka(copy);
     device_spacepoint_formation_algorithm sf_alpaka(mr, copy);
     traccc::alpaka::seeding_algorithm sa_alpaka(
@@ -254,6 +274,8 @@ int seq_run(const traccc::opts::detector& detector_opts,
                     ca(vecmem::get_data(cells_per_event), host_det_descr_data);
             }  // stop measuring clusterization cpu timer
 
+            // Perform seeding, track finding and fitting only when using a
+            // Detray geometry.
             if (detector_opts.use_detray_detector) {
 
                 // Alpaka
@@ -262,7 +284,7 @@ int seq_run(const traccc::opts::detector& detector_opts,
                         "Spacepoint formation (alpaka)", elapsedTimes);
                     spacepoints_alpaka_buffer = sf_alpaka(
                         device_detector_view, measurements_alpaka_buffer);
-                }  // stop measuring spacepoint formation cuda timer
+                }  // stop measuring spacepoint formation alpaka timer
 
                 // CPU
                 if (accelerator_opts.compare_with_cpu) {
@@ -302,6 +324,39 @@ int seq_run(const traccc::opts::detector& detector_opts,
                                                  elapsedTimes);
                     params = tp(spacepoints_per_event, seeds, field_vec);
                 }  // stop measuring track params cpu timer
+
+                // Alpaka
+                {
+                    traccc::performance::timer timer{"Track finding (alpaka)",
+                                                     elapsedTimes};
+                    track_candidates_buffer = finding_alg_alpaka(
+                        device_detector_view, field, measurements_alpaka_buffer,
+                        params_alpaka_buffer);
+                }
+
+                // CPU
+                if (accelerator_opts.compare_with_cpu) {
+                    traccc::performance::timer timer{"Track finding (cpu)",
+                                                     elapsedTimes};
+                    track_candidates = finding_alg(
+                        host_detector, field, measurements_per_event, params);
+                }
+
+                // Alpaka
+                {
+                    traccc::performance::timer timer{"Track fitting (alpaka)",
+                                                     elapsedTimes};
+                    track_states_buffer = fitting_alg_alpaka(
+                        device_detector_view, field, track_candidates_buffer);
+                }
+
+                // CPU
+                if (accelerator_opts.compare_with_cpu) {
+                    traccc::performance::timer timer{"Track fitting (cpu)",
+                                                     elapsedTimes};
+                    track_states =
+                        fitting_alg(host_detector, field, track_candidates);
+                }
             }
         }  // Stop measuring wall time
 
@@ -405,14 +460,8 @@ int seq_run(const traccc::opts::detector& detector_opts,
 
         if (performance_opts.run) {
 
-            traccc::event_data evt_data(input_opts.directory, event, host_mr,
-                                        input_opts.use_acts_geom_source,
-                                        &host_detector, input_opts.format,
-                                        false);
-
-            sd_performance_writer.write(vecmem::get_data(seeds),
-                                        vecmem::get_data(spacepoints_per_event),
-                                        evt_data);
+            // TODO: Do evt_data.fill_cca_result(...) with cuda clusters and
+            // measurements
         }
     }
 

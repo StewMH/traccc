@@ -25,10 +25,10 @@ set(LIBRARIES vecmem::core traccc::io traccc::performance
     traccc::options ${EXTRA_LIBS})
 set(DETRAY detray::io detray::detectors)
 
-# traccc_add_executable( seq_example_alpaka "seq_example_alpaka.cpp"
-#     LINK_LIBRARIES ${LIBRARIES} ${DETRAY} )
-# traccc_add_executable( seeding_example_alpaka "seeding_example_alpaka.cpp"
-#     LINK_LIBRARIES ${LIBRARIES} )
+traccc_add_executable( seq_example_alpaka "seq_example_alpaka.cpp"
+    LINK_LIBRARIES ${LIBRARIES} ${DETRAY} )
+traccc_add_executable( seeding_example_alpaka "seeding_example_alpaka.cpp"
+    LINK_LIBRARIES ${LIBRARIES} )
 
 #
 # Set up the "throughput applications".
