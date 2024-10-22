@@ -23,7 +23,7 @@ elseif(alpaka_ACC_GPU_HIP_ENABLE)
 set(LIBRARIES vecmem::core traccc::io traccc::performance
     traccc::core traccc::device_common traccc::alpaka alpaka::alpaka
     traccc::options ${EXTRA_LIBS})
-set(DETRAY detray::io detray::utils)
+set(DETRAY detray::io detray::detectors)
 
 traccc_add_executable( seq_example_alpaka "seq_example_alpaka.cpp"
     LINK_LIBRARIES ${LIBRARIES} ${DETRAY} )
@@ -37,7 +37,7 @@ add_library( traccc_examples_alpaka STATIC
    "full_chain_algorithm.hpp"
    "full_chain_algorithm.cpp" )
 target_link_libraries( traccc_examples_alpaka
-   PUBLIC alpaka::alpaka vecmem::core detray::core detray::utils
+   PUBLIC alpaka::alpaka vecmem::core detray::core detray::detectors
    traccc::core traccc::device_common traccc::alpaka ${EXTRA_LIBS})
 
 traccc_add_executable( throughput_st_alpaka "throughput_st.cpp"
