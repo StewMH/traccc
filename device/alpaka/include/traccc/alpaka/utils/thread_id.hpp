@@ -13,41 +13,41 @@
 #include "traccc/definitions/qualifiers.hpp"
 
 namespace traccc::alpaka {
-template <typename Acc>
+template <typename TAcc>
 struct thread_id1 {
-    TRACCC_DEVICE thread_id1(const Acc& acc) : m_acc(acc) {}
+    ALPAKA_FN_INLINE ALPAKA_FN_ACC thread_id1(const TAcc* acc) : m_acc(acc) {}
 
-    auto inline TRACCC_DEVICE getLocalThreadId() const {
-        return ::alpaka::getIdx<::alpaka::Block, ::alpaka::Threads>(m_acc)[0u];
+    auto inline ALPAKA_FN_ACC getLocalThreadId() const {
+        return ::alpaka::getIdx<::alpaka::Block, ::alpaka::Threads>(*m_acc)[0u];
     }
 
-    auto inline TRACCC_DEVICE getLocalThreadIdX() const {
+    auto inline ALPAKA_FN_ACC getLocalThreadIdX() const {
         return getLocalThreadId();
     }
 
-    auto inline TRACCC_DEVICE getGlobalThreadId() const {
+    auto inline ALPAKA_FN_ACC getGlobalThreadId() const {
         return getLocalThreadId() + getBlockIdX() * getBlockDimX();
     }
 
-    auto inline TRACCC_DEVICE getGlobalThreadIdX() const {
+    auto inline ALPAKA_FN_ACC getGlobalThreadIdX() const {
         return getLocalThreadId() + getBlockIdX() * getBlockDimX();
     }
 
-    auto inline TRACCC_DEVICE getBlockIdX() const {
-        return ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Blocks>(m_acc)[0u];
+    auto inline ALPAKA_FN_ACC getBlockIdX() const {
+        return ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Blocks>(*m_acc)[0u];
     }
 
-    auto inline TRACCC_DEVICE getBlockDimX() const {
+    auto inline ALPAKA_FN_ACC getBlockDimX() const {
         return ::alpaka::getWorkDiv<::alpaka::Block, ::alpaka::Threads>(
-            m_acc)[0u];
+            *m_acc)[0u];
     }
 
-    auto inline TRACCC_DEVICE getGridDimX() const {
+    auto inline ALPAKA_FN_ACC getGridDimX() const {
         return ::alpaka::getWorkDiv<::alpaka::Grid, ::alpaka::Blocks>(
-            m_acc)[0u];
+            *m_acc)[0u];
     }
 
     private:
-    const Acc& m_acc;
+    const TAcc* m_acc;
 };
 }  // namespace traccc::alpaka

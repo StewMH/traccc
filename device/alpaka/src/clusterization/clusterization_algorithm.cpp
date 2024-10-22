@@ -36,7 +36,7 @@ struct CCLKernel {
         measurement_collection_types::view measurements_view,
         vecmem::data::vector_view<unsigned int> cell_links) const {
 
-        traccc::alpaka::thread_id1 thread_id(acc);
+        traccc::alpaka::thread_id1 thread_id(&acc);
 
         auto& partition_start =
             ::alpaka::declareSharedVar<std::size_t, __COUNTER__>(acc);

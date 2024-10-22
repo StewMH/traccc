@@ -103,22 +103,22 @@ struct FindTracksKernel {
         bound_track_parameters_collection_types::view out_params_view,
         vecmem::data::vector_view<unsigned int> out_params_liveness_view,
         vecmem::data::vector_view<candidate_link> links_view,
-        unsigned int* n_candidates) {
+        unsigned int* n_candidates) const {
 
         auto& shared_candidates_size =
             ::alpaka::declareSharedVar<unsigned int, __COUNTER__>(acc);
         unsigned int* const s = ::alpaka::getDynSharedMem<unsigned int>(acc);
         unsigned int* shared_num_candidates = s;
 
-        alpaka::barrier barrier(acc);
-        alpaka::thread_id1 thread_id(acc);
+        alpaka::barrier<TAcc> barrier(&acc);
+        alpaka::thread_id1 thread_id(&acc);
 
         int blockDimX = thread_id.getBlockDimX();
         std::pair<unsigned int, unsigned int>* shared_candidates =
             reinterpret_cast<std::pair<unsigned int, unsigned int>*>(
                 &shared_num_candidates[blockDimX]);
 
-        device::find_tracks<alpaka::thread_id1, alpaka::barrier, detector_t,
+        device::find_tracks<alpaka::thread_id1<TAcc>, alpaka::barrier<TAcc>, detector_t,
                             config_t>(
             thread_id, barrier, cfg, det_data, measurements_view,
             in_params_view, in_params_liveness_view, n_in_params, barcodes_view,
@@ -135,7 +135,7 @@ struct FillSortKeysKernel {
         TAcc const& acc,
         bound_track_parameters_collection_types::const_view params_view,
         vecmem::data::vector_view<device::sort_key> keys_view,
-        vecmem::data::vector_view<unsigned int> ids_view) {
+        vecmem::data::vector_view<unsigned int> ids_view) const {
 
         int globalThreadIdx =
             ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
@@ -159,7 +159,7 @@ struct PropagateToNextSurfaceKernel {
         const unsigned int step, const unsigned int n_candidates,
         vecmem::data::vector_view<typename candidate_link::link_index_type>
             tips_view,
-        vecmem::data::vector_view<unsigned int> n_tracks_per_seed_view) {
+        vecmem::data::vector_view<unsigned int> n_tracks_per_seed_view) const {
 
         int globalThreadIdx =
             ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
@@ -184,7 +184,7 @@ struct BuildTracksKernel {
             tips_view,
         track_candidate_container_types::view track_candidates_view,
         vecmem::data::vector_view<unsigned int> valid_indices_view,
-        unsigned int* n_valid_tracks) {
+        unsigned int* n_valid_tracks) const {
 
         int globalThreadIdx =
             ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
@@ -358,7 +358,10 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
          * Kernel3: Count the number of measurements per parameter
          ****************************************************************/
 
-        unsigned int n_candidates = 0;
+        auto bufHost_n_candidates = ::alpaka::allocBuf<unsigned int, Idx>(devHost, 1u);
+        unsigned int n_candidates = *(::alpaka::getPtrNative(bufHost_n_candidates));
+        ::alpaka::memset(queue, bufHost_n_candidates, 0);
+        ::alpaka::wait(queue);
 
         {
             // Previous step
@@ -388,10 +391,9 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                 (n_in_params + threadsPerBlock - 1) / threadsPerBlock;
             auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
-            vecmem::unique_alloc_ptr<unsigned int> n_candidates_device =
-                vecmem::make_unique_alloc<unsigned int>(m_mr.main);
-            // TRACCC_CUDA_ERROR_CHECK(cudaMemsetAsync(
-            //     n_candidates_device.get(), 0, sizeof(unsigned int), stream));
+            auto n_candidates_device = ::alpaka::allocBuf<unsigned int, Idx>(devAcc, 1u);
+            ::alpaka::memset(queue, n_candidates_device, 0);
+            ::alpaka::wait(queue);
 
             ::alpaka::exec<Acc>(
                 queue, workDiv, FindTracksKernel<detector_type, config_type>{},
@@ -403,15 +405,15 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                 vecmem::get_data(link_map[prev_step]), step, n_max_candidates,
                 vecmem::get_data(updated_params_buffer),
                 vecmem::get_data(updated_liveness_buffer),
-                vecmem::get_data(link_map[step]), n_candidates_device.get());
+                vecmem::get_data(link_map[step]),
+                ::alpaka::getPtrNative(n_candidates_device));
             ::alpaka::wait(queue);
 
             std::swap(in_params_buffer, updated_params_buffer);
             std::swap(param_liveness_buffer, updated_liveness_buffer);
 
-            // TRACCC_CUDA_ERROR_CHECK(cudaMemcpyAsync(
-            //     &n_candidates, n_candidates_device.get(), sizeof(unsigned
-            //     int), cudaMemcpyDeviceToHost, stream));
+            ::alpaka::memcpy(queue, bufHost_n_candidates, n_candidates_device);
+            ::alpaka::wait(queue);
         }
 
         if (n_candidates > 0) {
@@ -460,6 +462,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                     (n_candidates + threadsPerBlock - 1) / threadsPerBlock;
                 auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
+                // TODO: Not using param_ids_device here!
                 ::alpaka::exec<Acc>(
                     queue, workDiv,
                     PropagateToNextSurfaceKernel<propagator_type, bfield_type,
@@ -519,34 +522,36 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
     vecmem::data::vector_buffer<unsigned int> valid_indices_buffer(n_tips_total,
                                                                    m_mr.main);
 
-    unsigned int n_valid_tracks;
+    // Count the number of valid tracks
+    auto bufHost_n_valid_tracks = ::alpaka::allocBuf<unsigned int, Idx>(devHost, 1u);
+    unsigned int n_valid_tracks = *(::alpaka::getPtrNative(bufHost_n_valid_tracks));
+    ::alpaka::memset(queue, bufHost_n_valid_tracks, 0);
+    ::alpaka::wait(queue);
 
     // @Note: nBlocks can be zero in case there is no tip. This happens when
     // chi2_max config is set tightly and no tips are found
     if (n_tips_total > 0) {
-        vecmem::unique_alloc_ptr<unsigned int> n_valid_tracks_device =
-            vecmem::make_unique_alloc<unsigned int>(m_mr.main);
-        // TRACCC_CUDA_ERROR_CHECK(cudaMemsetAsync(n_valid_tracks_device.get(),
-        // 0,
-        //                                         sizeof(unsigned int),
-        //                                         stream));
+        auto n_valid_tracks_device = ::alpaka::allocBuf<unsigned int, Idx>(devAcc, 1u);
+        ::alpaka::memset(queue, n_valid_tracks_device, 0);
 
         auto blocksPerGrid =
             (n_tips_total + threadsPerBlock - 1) / threadsPerBlock;
         auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
+        track_candidate_container_types::view track_candidates_view(
+            track_candidates_buffer);
+
         ::alpaka::exec<Acc>(
             queue, workDiv, BuildTracksKernel<config_type>{}, m_cfg,
             measurements, vecmem::get_data(seeds_buffer),
             vecmem::get_data(links_buffer), vecmem::get_data(tips_buffer),
-            track_candidates_buffer, vecmem::get_data(valid_indices_buffer),
-            n_valid_tracks_device.get());
+            track_candidates_view, vecmem::get_data(valid_indices_buffer),
+            ::alpaka::getPtrNative(n_valid_tracks_device));
         ::alpaka::wait(queue);
 
-        // // Global counter object: Device -> Host
-        // TRACCC_CUDA_ERROR_CHECK(cudaMemcpyAsync(
-        //     &n_valid_tracks, n_valid_tracks_device.get(), sizeof(unsigned
-        //     int), cudaMemcpyDeviceToHost, stream));
+        // Global counter object: Device -> Host
+        ::alpaka::memcpy(queue, bufHost_n_valid_tracks, n_valid_tracks_device);
+        ::alpaka::wait(queue);
     }
 
     // Create pruned candidate buffer
@@ -564,10 +569,16 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
             (n_valid_tracks + threadsPerBlock - 1) / threadsPerBlock;
         auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
+        track_candidate_container_types::const_view track_candidates_view(
+            track_candidates_buffer);
+
+        track_candidate_container_types::view prune_candidates_view(
+            prune_candidates_buffer);
+
         ::alpaka::exec<Acc>(queue, workDiv, PruneTracksKernel{},
-                          track_candidates_buffer,
+                          track_candidates_view,
                           vecmem::get_data(valid_indices_buffer),
-                          prune_candidates_buffer);
+                          prune_candidates_view);
         ::alpaka::wait(queue);
     }
 

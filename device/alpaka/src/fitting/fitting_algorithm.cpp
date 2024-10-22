@@ -32,7 +32,7 @@ struct FillSortKeysKernel {
         TAcc const& acc,
         track_candidate_container_types::const_view track_candidates_view,
         vecmem::data::vector_view<device::sort_key> keys_view,
-        vecmem::data::vector_view<unsigned int> ids_view) {
+        vecmem::data::vector_view<unsigned int> ids_view) const {
 
         int globalThreadIdx =
             ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
@@ -51,7 +51,7 @@ struct FitTrackKernel {
         const typename fitter_t::config_type cfg,
         track_candidate_container_types::const_view track_candidates_view,
         vecmem::data::vector_view<const unsigned int> param_ids_view,
-        track_state_container_types::view track_states_view) {
+        track_state_container_types::view track_states_view) const {
 
         int globalThreadIdx =
             ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
@@ -119,7 +119,7 @@ track_state_container_types::buffer fitting_algorithm<fitter_t>::operator()(
 
         // Get key and value for sorting
         ::alpaka::exec<Acc>(
-            queue, workDiv, FillSortKeysKernel{}, det_view, track_candidates_view,
+            queue, workDiv, FillSortKeysKernel{}, track_candidates_view,
             vecmem::get_data(keys_buffer), vecmem::get_data(param_ids_buffer));
         ::alpaka::wait(queue);
 
@@ -131,12 +131,13 @@ track_state_container_types::buffer fitting_algorithm<fitter_t>::operator()(
                             keys_device.end(), param_ids_device.begin());
 
         // Run the track fitting
+        // TODO: Not using the sorted parameter ids!
         ::alpaka::exec<Acc>(
             queue, workDiv,
             FitTrackKernel<fitter_t,
                            typename fitter_t::detector_type::view_type>{},
             det_view, field_view, m_cfg, track_candidates_view,
-            param_ids_device, track_states_view);
+            vecmem::get_data(param_ids_buffer), track_states_view);
         ::alpaka::wait(queue);
     }
 
