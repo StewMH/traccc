@@ -359,9 +359,10 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
          ****************************************************************/
 
         auto bufHost_n_candidates = ::alpaka::allocBuf<unsigned int, Idx>(devHost, 1u);
-        unsigned int n_candidates = *(::alpaka::getPtrNative(bufHost_n_candidates));
+        unsigned int* n_candidates = ::alpaka::getPtrNative(bufHost_n_candidates);
         ::alpaka::memset(queue, bufHost_n_candidates, 0);
         ::alpaka::wait(queue);
+
 
         {
             // Previous step
@@ -391,8 +392,8 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                 (n_in_params + threadsPerBlock - 1) / threadsPerBlock;
             auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
-            auto n_candidates_device = ::alpaka::allocBuf<unsigned int, Idx>(devAcc, 1u);
-            ::alpaka::memset(queue, n_candidates_device, 0);
+            auto bufAcc_n_candidates = ::alpaka::allocBuf<unsigned int, Idx>(devAcc, 1u);
+            ::alpaka::memset(queue, bufAcc_n_candidates, 0);
             ::alpaka::wait(queue);
 
             ::alpaka::exec<Acc>(
@@ -406,32 +407,32 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                 vecmem::get_data(updated_params_buffer),
                 vecmem::get_data(updated_liveness_buffer),
                 vecmem::get_data(link_map[step]),
-                ::alpaka::getPtrNative(n_candidates_device));
+                ::alpaka::getPtrNative(bufAcc_n_candidates));
             ::alpaka::wait(queue);
 
             std::swap(in_params_buffer, updated_params_buffer);
             std::swap(param_liveness_buffer, updated_liveness_buffer);
 
-            ::alpaka::memcpy(queue, bufHost_n_candidates, n_candidates_device);
+            ::alpaka::memcpy(queue, bufHost_n_candidates, bufAcc_n_candidates);
             ::alpaka::wait(queue);
         }
 
-        if (n_candidates > 0) {
+        if (*n_candidates > 0) {
             /*****************************************************************
              * Kernel4: Get key and value for parameter sorting
              *****************************************************************/
 
             vecmem::data::vector_buffer<unsigned int> param_ids_buffer(
-                n_candidates, m_mr.main);
+                *n_candidates, m_mr.main);
             m_copy.setup(param_ids_buffer)->ignore();
 
             {
                 vecmem::data::vector_buffer<device::sort_key> keys_buffer(
-                    n_candidates, m_mr.main);
+                    *n_candidates, m_mr.main);
                 m_copy.setup(keys_buffer)->ignore();
 
                 auto blocksPerGrid =
-                    (n_candidates + threadsPerBlock - 1) / threadsPerBlock;
+                    (*n_candidates + threadsPerBlock - 1) / threadsPerBlock;
                 auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
                 ::alpaka::exec<Acc>(queue, workDiv, FillSortKeysKernel{},
@@ -459,7 +460,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                 m_copy.memset(n_tracks_per_seed_buffer, 0)->ignore();
 
                 auto blocksPerGrid =
-                    (n_candidates + threadsPerBlock - 1) / threadsPerBlock;
+                    (*n_candidates + threadsPerBlock - 1) / threadsPerBlock;
                 auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
                 // TODO: Not using param_ids_device here!
@@ -471,7 +472,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                     vecmem::get_data(in_params_buffer),
                     vecmem::get_data(param_liveness_buffer),
                     vecmem::get_data(param_ids_buffer),
-                    vecmem::get_data(link_map[step]), step, n_candidates,
+                    vecmem::get_data(link_map[step]), step, *n_candidates,
                     vecmem::get_data(tips_buffer),
                     vecmem::get_data(n_tracks_per_seed_buffer));
                 ::alpaka::wait(queue);
@@ -479,9 +480,9 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
         }
 
         // Fill the candidate size vector
-        n_candidates_per_step.push_back(n_candidates);
+        n_candidates_per_step.push_back(*n_candidates);
 
-        n_in_params = n_candidates;
+        n_in_params = *n_candidates;
     }
 
     // Create link buffer
