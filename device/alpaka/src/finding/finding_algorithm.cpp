@@ -617,10 +617,10 @@ struct BlockSharedMemDynSizeBytes<
     ALPAKA_FN_HOST_ACC static auto getBlockSharedMemDynSizeBytes(
         traccc::alpaka::FindTracksKernel<detector_t,
                                          config_t> const& /* kernel */,
-        TVec const& /* blockThreadExtent */, TVec const& threadElemExtent,
+        TVec const& blockThreadExtent, TVec const& /* threadElemExtent */,
         TArgs const&... /* args */
         ) -> std::size_t {
-        return static_cast<std::size_t>(threadElemExtent.prod()) *
+        return static_cast<std::size_t>(blockThreadExtent.prod()) *
                sizeof(unsigned int) * 2 *
                sizeof(std::pair<unsigned int, unsigned int>);
     }
