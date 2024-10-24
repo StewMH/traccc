@@ -463,7 +463,6 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                     (*n_candidates + threadsPerBlock - 1) / threadsPerBlock;
                 auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
-                // TODO: Not using param_ids_device here!
                 ::alpaka::exec<Acc>(
                     queue, workDiv,
                     PropagateToNextSurfaceKernel<propagator_type, bfield_type,
@@ -525,7 +524,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
 
     // Count the number of valid tracks
     auto bufHost_n_valid_tracks = ::alpaka::allocBuf<unsigned int, Idx>(devHost, 1u);
-    unsigned int n_valid_tracks = *(::alpaka::getPtrNative(bufHost_n_valid_tracks));
+    unsigned int* n_valid_tracks = ::alpaka::getPtrNative(bufHost_n_valid_tracks);
     ::alpaka::memset(queue, bufHost_n_valid_tracks, 0);
     ::alpaka::wait(queue);
 
@@ -557,17 +556,17 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
 
     // Create pruned candidate buffer
     track_candidate_container_types::buffer prune_candidates_buffer{
-        {n_valid_tracks, m_mr.main},
-        {std::vector<std::size_t>(n_valid_tracks,
+        {*n_valid_tracks, m_mr.main},
+        {std::vector<std::size_t>(*n_valid_tracks,
                                   m_cfg.max_track_candidates_per_track),
          m_mr.main, m_mr.host, vecmem::data::buffer_type::resizable}};
 
     m_copy.setup(prune_candidates_buffer.headers)->ignore();
     m_copy.setup(prune_candidates_buffer.items)->ignore();
 
-    if (n_valid_tracks > 0) {
+    if (*n_valid_tracks > 0) {
         auto blocksPerGrid =
-            (n_valid_tracks + threadsPerBlock - 1) / threadsPerBlock;
+            (*n_valid_tracks + threadsPerBlock - 1) / threadsPerBlock;
         auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
         track_candidate_container_types::const_view track_candidates_view(

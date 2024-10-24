@@ -131,7 +131,6 @@ track_state_container_types::buffer fitting_algorithm<fitter_t>::operator()(
                             keys_device.end(), param_ids_device.begin());
 
         // Run the track fitting
-        // TODO: Not using the sorted parameter ids!
         ::alpaka::exec<Acc>(
             queue, workDiv,
             FitTrackKernel<fitter_t,

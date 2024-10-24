@@ -471,23 +471,23 @@ int seq_run(const traccc::opts::detector& detector_opts,
 
     std::cout << "==> Statistics ... " << std::endl;
     std::cout << "- read    " << n_cells << " cells" << std::endl;
-    std::cout << "- created (cpu)  " << n_measurements << " measurements     "
+    std::cout << "- created (cpu)     " << n_measurements << " measurements"
               << std::endl;
     std::cout << "- created (alpaka)  " << n_measurements_alpaka
-              << " measurements     " << std::endl;
-    std::cout << "- created (cpu)  " << n_spacepoints << " spacepoints     "
+              << " measurements" << std::endl;
+    std::cout << "- created (cpu)    " << n_spacepoints << " spacepoints"
               << std::endl;
     std::cout << "- created (alpaka) " << n_spacepoints_alpaka
               << " spacepoints     " << std::endl;
 
-    std::cout << "- created  (cpu) " << n_seeds << " seeds" << std::endl;
+    std::cout << "- created (cpu)    " << n_seeds << " seeds" << std::endl;
     std::cout << "- created (alpaka) " << n_seeds_alpaka << " seeds"
               << std::endl;
-    std::cout << "- found (cpu)    " << n_found_tracks << " tracks"
+    std::cout << "- found (cpu)      " << n_found_tracks << " tracks"
               << std::endl;
     std::cout << "- found (alpaka)   " << n_found_tracks_alpaka << " tracks"
               << std::endl;
-    std::cout << "- fitted (cpu)   " << n_fitted_tracks << " tracks"
+    std::cout << "- fitted (cpu)     " << n_fitted_tracks << " tracks"
               << std::endl;
     std::cout << "- fitted (alpaka)  " << n_fitted_tracks_alpaka << " tracks"
               << std::endl;
