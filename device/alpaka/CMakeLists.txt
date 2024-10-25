@@ -1,6 +1,6 @@
 # TRACCC library, part of the ACTS project (R&D line)
 #
-# (c) 2023 CERN for the benefit of the ACTS project
+# (c) 2023-2024 CERN for the benefit of the ACTS project
 #
 # Mozilla Public License Version 2.0
 
@@ -57,10 +57,13 @@ traccc_add_alpaka_library( traccc_alpaka alpaka TYPE SHARED
   # Finding
   "include/traccc/alpaka/finding/finding_algorithm.hpp"
   "src/finding/finding_algorithm.cpp"
-  "src/finding/kernels/build_tracks.hpp"
-  "src/finding/kernels/prune_tracks.hpp"
-  "src/finding/kernels/fill_sort_keys.hpp"
   "src/finding/kernels/make_barcode_sequence.hpp"
+  "src/finding/kernels/apply_interaction.hpp"
+  "src/finding/kernels/fill_sort_keys.hpp"
+  "src/finding/kernels/prune_tracks.hpp"
+  "src/finding/kernels/build_tracks.hpp"
+  "src/finding/kernels/find_tracks.hpp"
+  "src/finding/kernels/propagate_to_next_surface.hpp"
   # Fitting
   "include/traccc/alpaka/fitting/fitting_algorithm.hpp"
   "src/fitting/fitting_algorithm.cpp"

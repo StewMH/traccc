@@ -10,18 +10,18 @@
 
 #include "../utils/barrier.hpp"
 #include "../utils/utils.hpp"
+#include "./kernels/apply_interaction.hpp"
 #include "./kernels/build_tracks.hpp"
 #include "./kernels/fill_sort_keys.hpp"
+#include "./kernels/find_tracks.hpp"
 #include "./kernels/make_barcode_sequence.hpp"
+#include "./kernels/propagate_to_next_surface.hpp"
 #include "./kernels/prune_tracks.hpp"
 #include "traccc/alpaka/utils/thread_id.hpp"
 #include "traccc/definitions/primitives.hpp"
 #include "traccc/definitions/qualifiers.hpp"
 #include "traccc/edm/device/sort_key.hpp"
 #include "traccc/finding/candidate_link.hpp"
-#include "traccc/finding/device/apply_interaction.hpp"
-#include "traccc/finding/device/find_tracks.hpp"
-#include "traccc/finding/device/propagate_to_next_surface.hpp"
 #include "traccc/utils/projections.hpp"
 
 // detray include(s).
@@ -50,63 +50,6 @@
 #include <vector>
 
 namespace traccc::alpaka {
-
-template <typename detector_t>
-struct ApplyInteractionKernel {
-    template <typename TAcc>
-    ALPAKA_FN_ACC void operator()(
-        TAcc const& acc, const finding_config& cfg,
-        device::apply_interaction_payload<detector_t> payload) const {
-
-        int globalThreadIdx =
-            ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
-
-        device::apply_interaction<detector_t>(globalThreadIdx, cfg, payload);
-    }
-};
-
-template <typename detector_t>
-struct FindTracksKernel {
-    template <typename TAcc>
-    ALPAKA_FN_ACC void operator()(
-        TAcc const& acc, const finding_config& cfg,
-        device::find_tracks_payload<detector_t> payload) const {
-
-        auto& shared_candidates_size =
-            ::alpaka::declareSharedVar<unsigned int, __COUNTER__>(acc);
-        unsigned int* const s = ::alpaka::getDynSharedMem<unsigned int>(acc);
-        unsigned int* shared_num_candidates = s;
-
-        alpaka::barrier<TAcc> barrier(&acc);
-        alpaka::thread_id1 thread_id(&acc);
-
-        int blockDimX = thread_id.getBlockDimX();
-        std::pair<unsigned int, unsigned int>* shared_candidates =
-            reinterpret_cast<std::pair<unsigned int, unsigned int>*>(
-                &shared_num_candidates[blockDimX]);
-
-        device::find_tracks<alpaka::thread_id1<TAcc>, alpaka::barrier<TAcc>,
-                            detector_t, finding_config>(
-            thread_id, barrier, cfg, payload,
-            {shared_num_candidates, shared_candidates, shared_candidates_size});
-    }
-};
-
-template <typename propagator_t, typename bfield_t>
-struct PropagateToNextSurfaceKernel {
-    template <typename TAcc>
-    ALPAKA_FN_ACC void operator()(
-        TAcc const& acc, const finding_config cfg,
-        device::propagate_to_next_surface_payload<propagator_t, bfield_t>
-            payload) const {
-
-        int globalThreadIdx =
-            ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
-
-        device::propagate_to_next_surface<propagator_t, bfield_t>(
-            globalThreadIdx, cfg, payload);
-    }
-};
 
 template <typename stepper_t, typename navigator_t>
 finding_algorithm<stepper_t, navigator_t>::finding_algorithm(
