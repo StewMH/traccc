@@ -79,7 +79,7 @@ track_state_container_types::buffer fitting_algorithm<fitter_t>::operator()(
     auto devHost = ::alpaka::getDevByIdx(::alpaka::Platform<Host>{}, 0u);
     auto devAcc = ::alpaka::getDevByIdx(::alpaka::Platform<Acc>{}, 0u);
     auto queue = Queue{devAcc};
-    auto threadsPerBlock = warpSize * 2;
+    Idx threadsPerBlock = warpSize * 2;
 
 #if defined(ALPAKA_ACC_GPU_CUDA_ENABLED) || defined(ALPAKA_ACC_GPU_HIP_ENABLED)
     auto thrustExecPolicy = thrust::device;
@@ -108,7 +108,7 @@ track_state_container_types::buffer fitting_algorithm<fitter_t>::operator()(
     // Calculate the number of threads and thread blocks to run the track
     // fitting
     if (n_tracks > 0) {
-        const auto blocksPerGrid =
+        const Idx blocksPerGrid =
             (n_tracks + threadsPerBlock - 1) / threadsPerBlock;
         auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 

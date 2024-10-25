@@ -195,7 +195,7 @@ seed_finding::output_type seed_finding::operator()(
     auto queue = Queue{devAcc};
     auto const deviceProperties = ::alpaka::getAccDevProps<Acc>(devAcc);
     auto maxThreads = deviceProperties.m_blockThreadExtentMax[0];
-    auto threadsPerBlock =
+    Idx threadsPerBlock =
         warpSize * 2 < maxThreads ? warpSize * 2 : maxThreads;
 
     // Get the sizes from the grid view
@@ -217,7 +217,7 @@ seed_finding::output_type seed_finding::operator()(
 
     // Calculate the number of threads and thread blocks to run the doublet
     // counting kernel for.
-    auto blocksPerGrid =
+    Idx blocksPerGrid =
         (num_spacepoints + threadsPerBlock - 1) / threadsPerBlock;
     auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 

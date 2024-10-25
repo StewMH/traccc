@@ -15,7 +15,7 @@ namespace traccc::alpaka {
 
 struct PruneTracksKernel {
     template <typename TAcc>
-    ALPAKA_FN_ACC void PruneTracksKernel::operator()(
+    ALPAKA_FN_ACC void operator()(
         TAcc const& acc, device::prune_tracks_payload payload) const {
 
         int globalThreadIdx =

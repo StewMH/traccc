@@ -69,7 +69,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
     auto devHost = ::alpaka::getDevByIdx(::alpaka::Platform<Host>{}, 0u);
     auto devAcc = ::alpaka::getDevByIdx(::alpaka::Platform<Acc>{}, 0u);
     auto queue = Queue{devAcc};
-    auto threadsPerBlock = warpSize * 2;
+    Idx threadsPerBlock = warpSize * 2;
 
     // Copy setup
     m_copy.setup(seeds_buffer)->ignore();
@@ -100,7 +100,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
             thrust::unique_copy(thrustExecPolicy, measurements.ptr(),
                                 measurements.ptr() + n_measurements,
                                 uniques.begin(), measurement_equal_comp());
-        n_modules = uniques_end - uniques.begin();
+        n_modules = static_cast<unsigned int>(uniques_end - uniques.begin());
     }
 
     // Get upper bounds of unique elements
@@ -128,7 +128,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
     m_copy.setup(barcodes_buffer)->ignore();
 
     {
-        auto blocksPerGrid =
+        Idx blocksPerGrid =
             (barcodes_buffer.size() + threadsPerBlock - 1) / threadsPerBlock;
         auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
@@ -182,7 +182,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
          ****************************************************************/
 
         {
-            auto blocksPerGrid =
+            Idx blocksPerGrid =
                 (n_in_params + threadsPerBlock - 1) / threadsPerBlock;
             auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
@@ -231,7 +231,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                               m_mr.main};
             m_copy.setup(link_map[step])->ignore();
 
-            auto blocksPerGrid =
+            Idx blocksPerGrid =
                 (n_in_params + threadsPerBlock - 1) / threadsPerBlock;
             auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
@@ -276,7 +276,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                     *n_candidates, m_mr.main);
                 m_copy.setup(keys_buffer)->ignore();
 
-                auto blocksPerGrid =
+                Idx blocksPerGrid =
                     (*n_candidates + threadsPerBlock - 1) / threadsPerBlock;
                 auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
@@ -305,7 +305,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                 // Reset the number of tracks per seed
                 m_copy.memset(n_tracks_per_seed_buffer, 0)->ignore();
 
-                auto blocksPerGrid =
+                Idx blocksPerGrid =
                     (*n_candidates + threadsPerBlock - 1) / threadsPerBlock;
                 auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
@@ -387,7 +387,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
             ::alpaka::allocBuf<unsigned int, Idx>(devAcc, 1u);
         ::alpaka::memset(queue, n_valid_tracks_device, 0);
 
-        auto blocksPerGrid =
+        Idx blocksPerGrid =
             (n_tips_total + threadsPerBlock - 1) / threadsPerBlock;
         auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
@@ -419,7 +419,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
     m_copy.setup(prune_candidates_buffer.items)->ignore();
 
     if (*n_valid_tracks > 0) {
-        auto blocksPerGrid =
+        Idx blocksPerGrid =
             (*n_valid_tracks + threadsPerBlock - 1) / threadsPerBlock;
         auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
