@@ -54,15 +54,11 @@ namespace traccc::alpaka {
 struct MakeBarcodeSequenceKernel {
     template <typename TAcc>
     ALPAKA_FN_ACC void operator()(
-        TAcc const& acc,
-        measurement_collection_types::const_view measurements_view,
-        vecmem::data::vector_view<detray::geometry::barcode> barcodes_view)
-        const {
+        TAcc const& acc, device::make_barcode_sequence_payload payload) const {
 
         int globalThreadIdx =
             ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
-        device::make_barcode_sequence(globalThreadIdx, measurements_view,
-                                      barcodes_view);
+        device::make_barcode_sequence(globalThreadIdx, payload);
     }
 };
 
@@ -70,40 +66,22 @@ template <typename detector_t>
 struct ApplyInteractionKernel {
     template <typename TAcc>
     ALPAKA_FN_ACC void operator()(
-        TAcc const& acc, const typename detector_t::view_type& det_data,
-        const finding_config& cfg, const int n_params,
-        bound_track_parameters_collection_types::view params_view,
-        vecmem::data::vector_view<const unsigned int> params_liveness_view)
-        const {
+        TAcc const& acc, const finding_config& cfg,
+        device::apply_interaction_payload<detector_t> payload) const {
 
         int globalThreadIdx =
             ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
 
-        device::apply_interaction<detector_t>(globalThreadIdx, cfg, det_data,
-                                              n_params, params_view,
-                                              params_liveness_view);
+        device::apply_interaction<detector_t>(globalThreadIdx, cfg, payload);
     }
 };
 
-template <typename detector_t, typename config_t>
+template <typename detector_t>
 struct FindTracksKernel {
     template <typename TAcc>
     ALPAKA_FN_ACC void operator()(
-        TAcc const& acc, const config_t cfg,
-        typename detector_t::view_type det_data,
-        measurement_collection_types::const_view measurements_view,
-        bound_track_parameters_collection_types::const_view in_params_view,
-        vecmem::data::vector_view<const unsigned int> in_params_liveness_view,
-        const unsigned int n_in_params,
-        vecmem::data::vector_view<const detray::geometry::barcode>
-            barcodes_view,
-        vecmem::data::vector_view<const unsigned int> upper_bounds_view,
-        vecmem::data::vector_view<const candidate_link> prev_links_view,
-        const unsigned int step, const unsigned int n_max_candidates,
-        bound_track_parameters_collection_types::view out_params_view,
-        vecmem::data::vector_view<unsigned int> out_params_liveness_view,
-        vecmem::data::vector_view<candidate_link> links_view,
-        unsigned int* n_candidates) const {
+        TAcc const& acc, const finding_config& cfg,
+        device::find_tracks_payload<detector_t> payload) const {
 
         auto& shared_candidates_size =
             ::alpaka::declareSharedVar<unsigned int, __COUNTER__>(acc);
@@ -118,97 +96,62 @@ struct FindTracksKernel {
             reinterpret_cast<std::pair<unsigned int, unsigned int>*>(
                 &shared_num_candidates[blockDimX]);
 
-        device::find_tracks<alpaka::thread_id1<TAcc>, alpaka::barrier<TAcc>, detector_t,
-                            config_t>(
-            thread_id, barrier, cfg, det_data, measurements_view,
-            in_params_view, in_params_liveness_view, n_in_params, barcodes_view,
-            upper_bounds_view, prev_links_view, step, n_max_candidates,
-            out_params_view, out_params_liveness_view, links_view,
-            *n_candidates, shared_num_candidates, shared_candidates,
-            shared_candidates_size);
+        device::find_tracks<alpaka::thread_id1<TAcc>, alpaka::barrier<TAcc>,
+                            detector_t, finding_config>(
+            thread_id, barrier, cfg, payload,
+            {shared_num_candidates, shared_candidates, shared_candidates_size});
     }
 };
 
 struct FillSortKeysKernel {
     template <typename TAcc>
     ALPAKA_FN_ACC void operator()(
-        TAcc const& acc,
-        bound_track_parameters_collection_types::const_view params_view,
-        vecmem::data::vector_view<device::sort_key> keys_view,
-        vecmem::data::vector_view<unsigned int> ids_view) const {
+        TAcc const& acc, device::fill_sort_keys_payload payload) const {
 
         int globalThreadIdx =
             ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
 
-        device::fill_sort_keys(globalThreadIdx, params_view, keys_view,
-                               ids_view);
+        device::fill_sort_keys(globalThreadIdx, payload);
     }
 };
 
-template <typename propagator_t, typename bfield_t, typename config_t>
+template <typename propagator_t, typename bfield_t>
 struct PropagateToNextSurfaceKernel {
     template <typename TAcc>
     ALPAKA_FN_ACC void operator()(
-        TAcc const& acc, const config_t cfg,
-        typename propagator_t::detector_type::view_type det_data,
-        bfield_t field_data,
-        bound_track_parameters_collection_types::view params_view,
-        vecmem::data::vector_view<unsigned int> params_liveness_view,
-        vecmem::data::vector_view<const unsigned int> param_ids_view,
-        vecmem::data::vector_view<const candidate_link> links_view,
-        const unsigned int step, const unsigned int n_candidates,
-        vecmem::data::vector_view<typename candidate_link::link_index_type>
-            tips_view,
-        vecmem::data::vector_view<unsigned int> n_tracks_per_seed_view) const {
+        TAcc const& acc, const finding_config cfg,
+        device::propagate_to_next_surface_payload<propagator_t, bfield_t>
+            payload) const {
 
         int globalThreadIdx =
             ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
 
-        device::propagate_to_next_surface<propagator_t, bfield_t, config_t>(
-            globalThreadIdx, cfg, det_data, field_data, params_view,
-            params_liveness_view, param_ids_view, links_view, step,
-            n_candidates, tips_view, n_tracks_per_seed_view);
+        device::propagate_to_next_surface<propagator_t, bfield_t>(
+            globalThreadIdx, cfg, payload);
     }
 };
 
-template <typename config_t>
 struct BuildTracksKernel {
     template <typename TAcc>
-    ALPAKA_FN_ACC void operator()(
-        TAcc const& acc, const config_t cfg,
-        measurement_collection_types::const_view measurements_view,
-        bound_track_parameters_collection_types::const_view seeds_view,
-        vecmem::data::jagged_vector_view<const candidate_link> links_view,
-        vecmem::data::vector_view<
-            const typename candidate_link::link_index_type>
-            tips_view,
-        track_candidate_container_types::view track_candidates_view,
-        vecmem::data::vector_view<unsigned int> valid_indices_view,
-        unsigned int* n_valid_tracks) const {
+    ALPAKA_FN_ACC void operator()(TAcc const& acc, const finding_config cfg,
+                                  device::build_tracks_payload payload) const {
 
         int globalThreadIdx =
             ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
 
-        device::build_tracks(globalThreadIdx, cfg, measurements_view,
-                             seeds_view, links_view, tips_view,
-                             track_candidates_view, valid_indices_view,
-                             *n_valid_tracks);
+        device::build_tracks(globalThreadIdx, cfg, payload);
     }
 };
 
 struct PruneTracksKernel {
     template <typename TAcc>
-    ALPAKA_FN_ACC void operator()(
-        TAcc const& acc,
-        track_candidate_container_types::const_view track_candidates_view,
-        vecmem::data::vector_view<const unsigned int> valid_indices_view,
-        track_candidate_container_types::view prune_candidates_view) const {
+    ALPAKA_FN_ACC void operator()(TAcc const& acc,
+                                  device::prune_tracks_payload payload) const {
 
         int globalThreadIdx =
             ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
 
-        device::prune_tracks(globalThreadIdx, track_candidates_view,
-                             valid_indices_view, prune_candidates_view);
+        device::prune_tracks(globalThreadIdx, payload);
     }
 };
 
@@ -294,8 +237,9 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
         auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
         ::alpaka::exec<Acc>(queue, workDiv, MakeBarcodeSequenceKernel{},
-                            vecmem::get_data(uniques_buffer),
-                            vecmem::get_data(barcodes_buffer));
+                            device::make_barcode_sequence_payload{
+                                vecmem::get_data(uniques_buffer),
+                                vecmem::get_data(barcodes_buffer)});
         ::alpaka::wait(queue);
     }
 
@@ -346,11 +290,13 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                 (n_in_params + threadsPerBlock - 1) / threadsPerBlock;
             auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
-            ::alpaka::exec<Acc>(queue, workDiv,
-                                ApplyInteractionKernel<detector_type>{},
-                                det_view, m_cfg, n_in_params,
-                                vecmem::get_data(in_params_buffer),
-                                vecmem::get_data(param_liveness_buffer));
+            ::alpaka::exec<Acc>(
+                queue, workDiv,
+                ApplyInteractionKernel<std::decay_t<detector_type>>{}, m_cfg,
+                device::apply_interaction_payload<std::decay_t<detector_type>>{
+                    det_view, static_cast<int>(n_in_params),
+                    vecmem::get_data(in_params_buffer),
+                    vecmem::get_data(param_liveness_buffer)});
             ::alpaka::wait(queue);
         }
 
@@ -358,11 +304,12 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
          * Kernel3: Count the number of measurements per parameter
          ****************************************************************/
 
-        auto bufHost_n_candidates = ::alpaka::allocBuf<unsigned int, Idx>(devHost, 1u);
-        unsigned int* n_candidates = ::alpaka::getPtrNative(bufHost_n_candidates);
+        auto bufHost_n_candidates =
+            ::alpaka::allocBuf<unsigned int, Idx>(devHost, 1u);
+        unsigned int* n_candidates =
+            ::alpaka::getPtrNative(bufHost_n_candidates);
         ::alpaka::memset(queue, bufHost_n_candidates, 0);
         ::alpaka::wait(queue);
-
 
         {
             // Previous step
@@ -392,22 +339,24 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                 (n_in_params + threadsPerBlock - 1) / threadsPerBlock;
             auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
-            auto bufAcc_n_candidates = ::alpaka::allocBuf<unsigned int, Idx>(devAcc, 1u);
+            auto bufAcc_n_candidates =
+                ::alpaka::allocBuf<unsigned int, Idx>(devAcc, 1u);
             ::alpaka::memset(queue, bufAcc_n_candidates, 0);
             ::alpaka::wait(queue);
 
             ::alpaka::exec<Acc>(
-                queue, workDiv, FindTracksKernel<detector_type, config_type>{},
-                m_cfg, det_view, measurements,
-                vecmem::get_data(in_params_buffer),
-                vecmem::get_data(param_liveness_buffer), n_in_params,
-                vecmem::get_data(barcodes_buffer),
-                vecmem::get_data(upper_bounds_buffer),
-                vecmem::get_data(link_map[prev_step]), step, n_max_candidates,
-                vecmem::get_data(updated_params_buffer),
-                vecmem::get_data(updated_liveness_buffer),
-                vecmem::get_data(link_map[step]),
-                ::alpaka::getPtrNative(bufAcc_n_candidates));
+                queue, workDiv, FindTracksKernel<std::decay_t<detector_type>>{},
+                m_cfg,
+                device::find_tracks_payload<std::decay_t<detector_type>>{
+                    det_view, measurements, vecmem::get_data(in_params_buffer),
+                    vecmem::get_data(param_liveness_buffer), n_in_params,
+                    vecmem::get_data(barcodes_buffer),
+                    vecmem::get_data(upper_bounds_buffer),
+                    vecmem::get_data(link_map[prev_step]), step,
+                    n_max_candidates, vecmem::get_data(updated_params_buffer),
+                    vecmem::get_data(updated_liveness_buffer),
+                    vecmem::get_data(link_map[step]),
+                    ::alpaka::getPtrNative(bufAcc_n_candidates)});
             ::alpaka::wait(queue);
 
             std::swap(in_params_buffer, updated_params_buffer);
@@ -436,9 +385,10 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                 auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
 
                 ::alpaka::exec<Acc>(queue, workDiv, FillSortKeysKernel{},
-                                    vecmem::get_data(in_params_buffer),
-                                    vecmem::get_data(keys_buffer),
-                                    vecmem::get_data(param_ids_buffer));
+                                    device::fill_sort_keys_payload{
+                                        vecmem::get_data(in_params_buffer),
+                                        vecmem::get_data(keys_buffer),
+                                        vecmem::get_data(param_ids_buffer)});
                 ::alpaka::wait(queue);
 
                 // Sort the key and values
@@ -465,15 +415,19 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
 
                 ::alpaka::exec<Acc>(
                     queue, workDiv,
-                    PropagateToNextSurfaceKernel<propagator_type, bfield_type,
-                                                 config_type>{},
-                    m_cfg, det_view, field_view,
-                    vecmem::get_data(in_params_buffer),
-                    vecmem::get_data(param_liveness_buffer),
-                    vecmem::get_data(param_ids_buffer),
-                    vecmem::get_data(link_map[step]), step, *n_candidates,
-                    vecmem::get_data(tips_buffer),
-                    vecmem::get_data(n_tracks_per_seed_buffer));
+                    PropagateToNextSurfaceKernel<std::decay_t<propagator_type>,
+                                                 std::decay_t<bfield_type>>{},
+                    m_cfg,
+                    device::propagate_to_next_surface_payload<
+                        std::decay_t<propagator_type>,
+                        std::decay_t<bfield_type>>{
+                        det_view, field_view,
+                        vecmem::get_data(in_params_buffer),
+                        vecmem::get_data(param_liveness_buffer),
+                        vecmem::get_data(param_ids_buffer),
+                        vecmem::get_data(link_map[step]), step, *n_candidates,
+                        vecmem::get_data(tips_buffer),
+                        vecmem::get_data(n_tracks_per_seed_buffer)});
                 ::alpaka::wait(queue);
             }
         }
@@ -523,15 +477,18 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                                                                    m_mr.main);
 
     // Count the number of valid tracks
-    auto bufHost_n_valid_tracks = ::alpaka::allocBuf<unsigned int, Idx>(devHost, 1u);
-    unsigned int* n_valid_tracks = ::alpaka::getPtrNative(bufHost_n_valid_tracks);
+    auto bufHost_n_valid_tracks =
+        ::alpaka::allocBuf<unsigned int, Idx>(devHost, 1u);
+    unsigned int* n_valid_tracks =
+        ::alpaka::getPtrNative(bufHost_n_valid_tracks);
     ::alpaka::memset(queue, bufHost_n_valid_tracks, 0);
     ::alpaka::wait(queue);
 
     // @Note: nBlocks can be zero in case there is no tip. This happens when
     // chi2_max config is set tightly and no tips are found
     if (n_tips_total > 0) {
-        auto n_valid_tracks_device = ::alpaka::allocBuf<unsigned int, Idx>(devAcc, 1u);
+        auto n_valid_tracks_device =
+            ::alpaka::allocBuf<unsigned int, Idx>(devAcc, 1u);
         ::alpaka::memset(queue, n_valid_tracks_device, 0);
 
         auto blocksPerGrid =
@@ -542,11 +499,12 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
             track_candidates_buffer);
 
         ::alpaka::exec<Acc>(
-            queue, workDiv, BuildTracksKernel<config_type>{}, m_cfg,
-            measurements, vecmem::get_data(seeds_buffer),
-            vecmem::get_data(links_buffer), vecmem::get_data(tips_buffer),
-            track_candidates_view, vecmem::get_data(valid_indices_buffer),
-            ::alpaka::getPtrNative(n_valid_tracks_device));
+            queue, workDiv, BuildTracksKernel{}, m_cfg,
+            device::build_tracks_payload{
+                measurements, vecmem::get_data(seeds_buffer),
+                vecmem::get_data(links_buffer), vecmem::get_data(tips_buffer),
+                track_candidates_view, vecmem::get_data(valid_indices_buffer),
+                ::alpaka::getPtrNative(n_valid_tracks_device)});
         ::alpaka::wait(queue);
 
         // Global counter object: Device -> Host
@@ -575,10 +533,11 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
         track_candidate_container_types::view prune_candidates_view(
             prune_candidates_buffer);
 
-        ::alpaka::exec<Acc>(queue, workDiv, PruneTracksKernel{},
-                          track_candidates_view,
-                          vecmem::get_data(valid_indices_buffer),
-                          prune_candidates_view);
+        ::alpaka::exec<Acc>(
+            queue, workDiv, PruneTracksKernel{},
+            device::prune_tracks_payload{track_candidates_view,
+                                         vecmem::get_data(valid_indices_buffer),
+                                         prune_candidates_view});
         ::alpaka::wait(queue);
     }
 
@@ -609,13 +568,12 @@ struct IsKernelArgumentTriviallyCopyable<
 // Also need to add an Alpaka trait for the dynamic shared memory
 namespace alpaka::trait {
 
-template <typename TAcc, typename detector_t, typename config_t>
-struct BlockSharedMemDynSizeBytes<
-    traccc::alpaka::FindTracksKernel<detector_t, config_t>, TAcc> {
+template <typename TAcc, typename detector_t>
+struct BlockSharedMemDynSizeBytes<traccc::alpaka::FindTracksKernel<detector_t>,
+                                  TAcc> {
     template <typename TVec, typename... TArgs>
     ALPAKA_FN_HOST_ACC static auto getBlockSharedMemDynSizeBytes(
-        traccc::alpaka::FindTracksKernel<detector_t,
-                                         config_t> const& /* kernel */,
+        traccc::alpaka::FindTracksKernel<detector_t> const& /* kernel */,
         TVec const& blockThreadExtent, TVec const& /* threadElemExtent */,
         TArgs const&... /* args */
         ) -> std::size_t {
