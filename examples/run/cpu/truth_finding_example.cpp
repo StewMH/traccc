@@ -9,7 +9,7 @@
 #include "traccc/definitions/common.hpp"
 #include "traccc/definitions/primitives.hpp"
 #include "traccc/efficiency/finding_performance_writer.hpp"
-#include "traccc/finding/finding_algorithm.hpp"
+#include "traccc/finding/ckf_algorithm.hpp"
 #include "traccc/fitting/fitting_algorithm.hpp"
 #include "traccc/fitting/kalman_filter/kalman_fitter.hpp"
 #include "traccc/io/read_detector.hpp"
@@ -105,13 +105,11 @@ int seq_run(const traccc::opts::track_finding& finding_opts,
     detray::propagation::config propagation_config(propagation_opts);
 
     // Finding algorithm configuration
-    typename traccc::finding_algorithm<
-        rk_stepper_type, host_navigator_type>::config_type cfg(finding_opts);
+    typename traccc::finding_config cfg(finding_opts);
     cfg.propagation = propagation_config;
 
     // Finding algorithm object
-    traccc::finding_algorithm<rk_stepper_type, host_navigator_type>
-        host_finding(cfg);
+    traccc::host::ckf_algorithm host_finding(cfg);
 
     // Fitting algorithm object
     typename traccc::fitting_algorithm<host_fitter_type>::config_type fit_cfg;
@@ -124,7 +122,7 @@ int seq_run(const traccc::opts::track_finding& finding_opts,
                                                               stddevs);
 
     // Iterate over events
-    for (unsigned int event = input_opts.skip;
+    for (std::size_t event = input_opts.skip;
          event < input_opts.events + input_opts.skip; ++event) {
 
         // Truth Track Candidates
@@ -137,8 +135,8 @@ int seq_run(const traccc::opts::track_finding& finding_opts,
 
         // Prepare truth seeds
         traccc::bound_track_parameters_collection_types::host seeds(&host_mr);
-        const unsigned int n_tracks = truth_track_candidates.size();
-        for (unsigned int i_trk = 0; i_trk < n_tracks; i_trk++) {
+        const std::size_t n_tracks = truth_track_candidates.size();
+        for (std::size_t i_trk = 0; i_trk < n_tracks; i_trk++) {
             seeds.push_back(truth_track_candidates.at(i_trk).header);
         }
 
@@ -151,8 +149,9 @@ int seq_run(const traccc::opts::track_finding& finding_opts,
             input_opts.format);
 
         // Run finding
-        auto track_candidates =
-            host_finding(detector, field, measurements_per_event, seeds);
+        auto track_candidates = host_finding(
+            detector, field, vecmem::get_data(measurements_per_event),
+            vecmem::get_data(seeds));
 
         std::cout << "Number of found tracks: " << track_candidates.size()
                   << std::endl;
@@ -163,13 +162,13 @@ int seq_run(const traccc::opts::track_finding& finding_opts,
         std::cout << "Number of fitted tracks: " << track_states.size()
                   << std::endl;
 
-        const unsigned int n_fitted_tracks = track_states.size();
+        const std::size_t n_fitted_tracks = track_states.size();
 
         if (performance_opts.run) {
             find_performance_writer.write(traccc::get_data(track_candidates),
                                           evt_data);
 
-            for (unsigned int i = 0; i < n_fitted_tracks; i++) {
+            for (std::size_t i = 0; i < n_fitted_tracks; i++) {
                 const auto& trk_states_per_track = track_states.at(i).items;
 
                 const auto& fit_res = track_states[i].header;

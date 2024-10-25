@@ -14,7 +14,7 @@
 #include "traccc/device/container_d2h_copy_alg.hpp"
 #include "traccc/device/container_h2d_copy_alg.hpp"
 #include "traccc/efficiency/finding_performance_writer.hpp"
-#include "traccc/finding/finding_algorithm.hpp"
+#include "traccc/finding/ckf_algorithm.hpp"
 #include "traccc/fitting/fitting_algorithm.hpp"
 #include "traccc/fitting/kalman_filter/kalman_fitter.hpp"
 #include "traccc/io/read_detector.hpp"
@@ -151,8 +151,7 @@ int seq_run(const traccc::opts::track_finding& finding_opts,
     cfg.propagation = propagation_config;
 
     // Finding algorithm object
-    traccc::finding_algorithm<rk_stepper_type, host_navigator_type>
-        host_finding(cfg);
+    traccc::host::ckf_algorithm host_finding(cfg);
     traccc::cuda::finding_algorithm<rk_stepper_type, device_navigator_type>
         device_finding(cfg, mr, async_copy, stream);
 
@@ -171,7 +170,7 @@ int seq_run(const traccc::opts::track_finding& finding_opts,
                                                               stddevs);
 
     // Iterate over events
-    for (unsigned int event = input_opts.skip;
+    for (std::size_t event = input_opts.skip;
          event < input_opts.events + input_opts.skip; ++event) {
 
         // Truth Track Candidates
@@ -184,8 +183,8 @@ int seq_run(const traccc::opts::track_finding& finding_opts,
 
         // Prepare truth seeds
         traccc::bound_track_parameters_collection_types::host seeds(mr.host);
-        const unsigned int n_tracks = truth_track_candidates.size();
-        for (unsigned int i_trk = 0; i_trk < n_tracks; i_trk++) {
+        const std::size_t n_tracks = truth_track_candidates.size();
+        for (std::size_t i_trk = 0; i_trk < n_tracks; i_trk++) {
             seeds.push_back(truth_track_candidates.at(i_trk).header);
         }
 
@@ -204,7 +203,7 @@ int seq_run(const traccc::opts::track_finding& finding_opts,
             input_opts.format);
 
         traccc::measurement_collection_types::buffer measurements_cuda_buffer(
-            measurements_per_event.size(), mr.main);
+            static_cast<unsigned int>(measurements_per_event.size()), mr.main);
         async_copy(vecmem::get_data(measurements_per_event),
                    measurements_cuda_buffer);
 
@@ -241,8 +240,7 @@ int seq_run(const traccc::opts::track_finding& finding_opts,
             track_state_d2h(track_states_cuda_buffer);
 
         // CPU containers
-        traccc::finding_algorithm<
-            rk_stepper_type, host_navigator_type>::output_type track_candidates;
+        traccc::host::ckf_algorithm::output_type track_candidates;
         traccc::fitting_algorithm<host_fitter_type>::output_type track_states;
 
         if (accelerator_opts.compare_with_cpu) {
@@ -252,8 +250,9 @@ int seq_run(const traccc::opts::track_finding& finding_opts,
                                              elapsedTimes);
 
                 // Run finding
-                track_candidates = host_finding(detector, field,
-                                                measurements_per_event, seeds);
+                track_candidates = host_finding(
+                    detector, field, vecmem::get_data(measurements_per_event),
+                    vecmem::get_data(seeds));
             }
 
             {
@@ -283,7 +282,8 @@ int seq_run(const traccc::opts::track_finding& finding_opts,
                 }
             }
             std::cout << "Track candidate matching Rate: "
-                      << float(n_matches) / track_candidates.size()
+                      << float(n_matches) /
+                             static_cast<float>(track_candidates.size())
                       << std::endl;
 
             // Compare the track parameters made on the host and on the device.

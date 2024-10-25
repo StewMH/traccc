@@ -17,7 +17,7 @@
 #include "traccc/efficiency/nseed_performance_writer.hpp"
 #include "traccc/efficiency/seeding_performance_writer.hpp"
 #include "traccc/efficiency/track_filter.hpp"
-#include "traccc/finding/finding_algorithm.hpp"
+#include "traccc/finding/ckf_algorithm.hpp"
 #include "traccc/fitting/fitting_algorithm.hpp"
 #include "traccc/io/read_detector.hpp"
 #include "traccc/io/read_detector_description.hpp"
@@ -174,8 +174,7 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
     cfg.propagation = propagation_config;
 
     // Finding algorithm object
-    traccc::finding_algorithm<rk_stepper_type, host_navigator_type>
-        host_finding(cfg);
+    traccc::host::ckf_algorithm host_finding(cfg);
     traccc::cuda::finding_algorithm<rk_stepper_type, device_navigator_type>
         device_finding(cfg, mr, async_copy, stream);
 
@@ -244,13 +243,15 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
 
             // Copy the spacepoint and module data to the device.
             traccc::spacepoint_collection_types::buffer spacepoints_cuda_buffer(
-                spacepoints_per_event.size(), mr.main);
+                static_cast<unsigned int>(spacepoints_per_event.size()),
+                mr.main);
             async_copy(vecmem::get_data(spacepoints_per_event),
                        spacepoints_cuda_buffer);
 
             traccc::measurement_collection_types::buffer
-                measurements_cuda_buffer(measurements_per_event.size(),
-                                         mr.main);
+                measurements_cuda_buffer(
+                    static_cast<unsigned int>(measurements_per_event.size()),
+                    mr.main);
             async_copy(vecmem::get_data(measurements_per_event),
                        measurements_cuda_buffer);
 
@@ -308,8 +309,9 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
             if (accelerator_opts.compare_with_cpu) {
                 traccc::performance::timer t("Track finding with CKF (cpu)",
                                              elapsedTimes);
-                track_candidates = host_finding(host_det, field,
-                                                measurements_per_event, params);
+                track_candidates = host_finding(
+                    host_det, field, vecmem::get_data(measurements_per_event),
+                    vecmem::get_data(params));
             }
 
             /*------------------------
@@ -384,7 +386,8 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
                 }
             }
             std::cout << "Track candidate matching Rate: "
-                      << float(n_matches) / track_candidates.size()
+                      << float(n_matches) /
+                             static_cast<float>(track_candidates.size())
                       << std::endl;
         }
 

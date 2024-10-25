@@ -19,7 +19,7 @@
 #include "traccc/options/detector.hpp"
 #include "traccc/options/input_data.hpp"
 #include "traccc/options/program_options.hpp"
-#include "traccc/seeding/spacepoint_formation_algorithm.hpp"
+#include "traccc/seeding/silicon_pixel_spacepoint_formation_algorithm.hpp"
 
 // VecMem include(s).
 #include <vecmem/memory/host_memory_resource.hpp>
@@ -65,8 +65,7 @@ int par_run(const traccc::opts::input_data& input_opts,
 
     // Type definitions
     using spacepoint_formation_algorithm =
-        traccc::host::spacepoint_formation_algorithm<
-            traccc::default_detector::host>;
+        traccc::host::silicon_pixel_spacepoint_formation_algorithm;
 
     // Algorithms
     traccc::host::clusterization_algorithm ca(resource);
@@ -79,7 +78,7 @@ int par_run(const traccc::opts::input_data& input_opts,
 
 #pragma omp parallel for reduction(+ : n_cells, n_measurements, n_spacepoints)
     // Loop over events
-    for (unsigned int event = input_opts.skip;
+    for (std::size_t event = input_opts.skip;
          event < input_opts.events + input_opts.skip; ++event) {
 
         // Read the cells from the relevant event file

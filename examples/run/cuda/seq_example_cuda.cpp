@@ -17,7 +17,7 @@
 #include "traccc/cuda/utils/stream.hpp"
 #include "traccc/device/container_d2h_copy_alg.hpp"
 #include "traccc/efficiency/seeding_performance_writer.hpp"
-#include "traccc/finding/finding_algorithm.hpp"
+#include "traccc/finding/ckf_algorithm.hpp"
 #include "traccc/fitting/fitting_algorithm.hpp"
 #include "traccc/io/read_cells.hpp"
 #include "traccc/io/read_detector.hpp"
@@ -36,7 +36,7 @@
 #include "traccc/performance/container_comparator.hpp"
 #include "traccc/performance/timer.hpp"
 #include "traccc/seeding/seeding_algorithm.hpp"
-#include "traccc/seeding/spacepoint_formation_algorithm.hpp"
+#include "traccc/seeding/silicon_pixel_spacepoint_formation_algorithm.hpp"
 #include "traccc/seeding/track_params_estimation.hpp"
 
 // Detray include(s).
@@ -122,8 +122,7 @@ int seq_run(const traccc::opts::detector& detector_opts,
 
     // Type definitions
     using host_spacepoint_formation_algorithm =
-        traccc::host::spacepoint_formation_algorithm<
-            traccc::default_detector::host>;
+        traccc::host::silicon_pixel_spacepoint_formation_algorithm;
     using device_spacepoint_formation_algorithm =
         traccc::cuda::spacepoint_formation_algorithm<
             traccc::default_detector::device>;
@@ -136,8 +135,7 @@ int seq_run(const traccc::opts::detector& detector_opts,
     using device_navigator_type =
         detray::navigator<const traccc::default_detector::device>;
 
-    using host_finding_algorithm =
-        traccc::finding_algorithm<stepper_type, host_navigator_type>;
+    using host_finding_algorithm = traccc::host::ckf_algorithm;
     using device_finding_algorithm =
         traccc::cuda::finding_algorithm<stepper_type, device_navigator_type>;
 
@@ -194,14 +192,13 @@ int seq_run(const traccc::opts::detector& detector_opts,
     traccc::performance::timing_info elapsedTimes;
 
     // Loop over events
-    for (unsigned int event = input_opts.skip;
+    for (std::size_t event = input_opts.skip;
          event < input_opts.events + input_opts.skip; ++event) {
 
         // Instantiate host containers/collections
         traccc::host::clusterization_algorithm::output_type
             measurements_per_event;
-        traccc::host::spacepoint_formation_algorithm<
-            traccc::default_detector::host>::output_type spacepoints_per_event;
+        host_spacepoint_formation_algorithm::output_type spacepoints_per_event;
         traccc::seeding_algorithm::output_type seeds;
         traccc::track_params_estimation::output_type params;
         host_finding_algorithm::output_type track_candidates;
@@ -236,7 +233,7 @@ int seq_run(const traccc::opts::detector& detector_opts,
 
             // Create device copy of input collections
             traccc::edm::silicon_cell_collection::buffer cells_buffer(
-                cells_per_event.size(), mr.main);
+                static_cast<unsigned int>(cells_per_event.size()), mr.main);
             copy(vecmem::get_data(cells_per_event), cells_buffer);
 
             // CUDA
@@ -324,8 +321,10 @@ int seq_run(const traccc::opts::detector& detector_opts,
                 if (accelerator_opts.compare_with_cpu) {
                     traccc::performance::timer timer{"Track finding (cpu)",
                                                      elapsedTimes};
-                    track_candidates = finding_alg(
-                        host_detector, field, measurements_per_event, params);
+                    track_candidates =
+                        finding_alg(host_detector, field,
+                                    vecmem::get_data(measurements_per_event),
+                                    vecmem::get_data(params));
                 }
 
                 // CUDA
@@ -419,9 +418,10 @@ int seq_run(const traccc::opts::detector& detector_opts,
             }
 
             std::cout << "  Track candidates (item) matching rate: "
-                      << 100. * float(n_matches) /
-                             std::max(track_candidates.size(),
-                                      track_candidates_cuda.size())
+                      << 100. * static_cast<double>(n_matches) /
+                             static_cast<double>(
+                                 std::max(track_candidates.size(),
+                                          track_candidates_cuda.size()))
                       << "%" << std::endl;
 
             // Compare tracks fitted on the host and on the device.

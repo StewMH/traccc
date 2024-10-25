@@ -15,10 +15,10 @@
 // algorithms
 #include "traccc/ambiguity_resolution/greedy_ambiguity_resolution_algorithm.hpp"
 #include "traccc/clusterization/clusterization_algorithm.hpp"
-#include "traccc/finding/finding_algorithm.hpp"
+#include "traccc/finding/ckf_algorithm.hpp"
 #include "traccc/fitting/fitting_algorithm.hpp"
 #include "traccc/seeding/seeding_algorithm.hpp"
-#include "traccc/seeding/spacepoint_formation_algorithm.hpp"
+#include "traccc/seeding/silicon_pixel_spacepoint_formation_algorithm.hpp"
 #include "traccc/seeding/track_params_estimation.hpp"
 
 // performance
@@ -99,16 +99,14 @@ int seq_run(const traccc::opts::input_data& input_opts,
 
     // Type definitions
     using spacepoint_formation_algorithm =
-        traccc::host::spacepoint_formation_algorithm<
-            traccc::default_detector::host>;
+        traccc::host::silicon_pixel_spacepoint_formation_algorithm;
     using stepper_type =
         detray::rk_stepper<detray::bfield::const_field_t::view_t,
                            traccc::default_detector::host::algebra_type,
                            detray::constrained_step<>>;
     using navigator_type =
         detray::navigator<const traccc::default_detector::host>;
-    using finding_algorithm =
-        traccc::finding_algorithm<stepper_type, navigator_type>;
+    using finding_algorithm = traccc::host::ckf_algorithm;
     using fitting_algorithm = traccc::fitting_algorithm<
         traccc::kalman_fitter<stepper_type, navigator_type>>;
 
@@ -155,7 +153,7 @@ int seq_run(const traccc::opts::input_data& input_opts,
     traccc::performance::timing_info elapsedTimes;
 
     // Loop over events
-    for (unsigned int event = input_opts.skip;
+    for (std::size_t event = input_opts.skip;
          event < input_opts.events + input_opts.skip; ++event) {
 
         traccc::edm::silicon_cell_collection::host cells_per_event{host_mr};
@@ -163,8 +161,7 @@ int seq_run(const traccc::opts::input_data& input_opts,
             host_mr};
         traccc::host::measurement_creation_algorithm::output_type
             measurements_per_event{&host_mr};
-        traccc::host::spacepoint_formation_algorithm<
-            const traccc::default_detector>::output_type spacepoints_per_event{
+        spacepoint_formation_algorithm::output_type spacepoints_per_event{
             &host_mr};
         traccc::seeding_algorithm::output_type seeds{&host_mr};
         traccc::track_params_estimation::output_type params{&host_mr};
@@ -246,8 +243,10 @@ int seq_run(const traccc::opts::input_data& input_opts,
                 {
                     traccc::performance::timer timer{"Track finding",
                                                      elapsedTimes};
-                    track_candidates = finding_alg(
-                        detector, field, measurements_per_event, params);
+                    track_candidates =
+                        finding_alg(detector, field,
+                                    vecmem::get_data(measurements_per_event),
+                                    vecmem::get_data(params));
                 }
                 if (output_opts.directory != "") {
                     traccc::io::write(

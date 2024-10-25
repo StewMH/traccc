@@ -9,7 +9,7 @@
 #include "traccc/cuda/finding/finding_algorithm.hpp"
 #include "traccc/device/container_d2h_copy_alg.hpp"
 #include "traccc/device/container_h2d_copy_alg.hpp"
-#include "traccc/finding/finding_algorithm.hpp"
+#include "traccc/finding/ckf_algorithm.hpp"
 #include "traccc/io/read_measurements.hpp"
 #include "traccc/io/utils.hpp"
 #include "traccc/performance/container_comparator.hpp"
@@ -143,8 +143,7 @@ TEST_P(CkfToyDetectorTests, Run) {
     cfg.propagation.navigation.search_window = search_window;
 
     // Finding algorithm object
-    traccc::finding_algorithm<rk_stepper_type, host_navigator_type>
-        host_finding(cfg);
+    traccc::host::ckf_algorithm host_finding(cfg);
 
     // Finding algorithm object
     traccc::cuda::finding_algorithm<rk_stepper_type, device_navigator_type>
@@ -180,7 +179,7 @@ TEST_P(CkfToyDetectorTests, Run) {
         traccc::io::read_measurements(measurements_per_event, i_evt, path);
 
         traccc::measurement_collection_types::buffer measurements_buffer(
-            measurements_per_event.size(), mr.main);
+            static_cast<unsigned int>(measurements_per_event.size()), mr.main);
         copy(vecmem::get_data(measurements_per_event), measurements_buffer);
 
         // Instantiate output cuda containers/collections
@@ -191,8 +190,9 @@ TEST_P(CkfToyDetectorTests, Run) {
         copy.setup(track_candidates_cuda_buffer.items);
 
         // Run host finding
-        auto track_candidates =
-            host_finding(host_det, field, measurements_per_event, seeds);
+        auto track_candidates = host_finding(
+            host_det, field, vecmem::get_data(measurements_per_event),
+            vecmem::get_data(seeds));
 
         // Run device finding
         track_candidates_cuda_buffer =
@@ -202,7 +202,9 @@ TEST_P(CkfToyDetectorTests, Run) {
             track_candidate_d2h(track_candidates_cuda_buffer);
 
         // Simple check
-        ASSERT_NEAR(track_candidates.size(), track_candidates_cuda.size(), 1u);
+        ASSERT_TRUE(
+            std::llabs(static_cast<long>(track_candidates.size()) -
+                       static_cast<long>(track_candidates_cuda.size())) <= 1u);
         ASSERT_GE(track_candidates.size(), n_truth_tracks);
 
         // Make sure that the outputs from cpu and cuda CKF are equivalent
@@ -221,7 +223,8 @@ TEST_P(CkfToyDetectorTests, Run) {
 
         float matching_rate =
             float(n_matches) /
-            std::max(track_candidates.size(), track_candidates_cuda.size());
+            static_cast<float>(std::max(track_candidates.size(),
+                                        track_candidates_cuda.size()));
         EXPECT_GE(matching_rate, 0.999f);
     }
 }
