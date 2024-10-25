@@ -258,7 +258,6 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
 
             // Alpaka
 
-            // TODO: Check this (and all other copies) are intelligent.
             // Copy the spacepoint data to the device.
             traccc::spacepoint_collection_types::buffer
                 spacepoints_alpaka_buffer(
@@ -268,8 +267,9 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
                  spacepoints_alpaka_buffer);
 
             traccc::measurement_collection_types::buffer
-                measurements_alpaka_buffer(measurements_per_event.size(),
-                                           mr.main);
+                measurements_alpaka_buffer(
+                    static_cast<unsigned int>(measurements_per_event.size()),
+                    mr.main);
             copy(vecmem::get_data(measurements_per_event),
                  measurements_alpaka_buffer);
 
@@ -404,7 +404,8 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
                 }
             }
             std::cout << "Track candidate matching Rate: "
-                      << float(n_matches) / track_candidates.size()
+                      << float(n_matches) /
+                             static_cast<float>(track_candidates.size())
                       << std::endl;
         }
 

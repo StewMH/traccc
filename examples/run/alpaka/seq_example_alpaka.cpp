@@ -432,9 +432,10 @@ int seq_run(const traccc::opts::detector& detector_opts,
             }
 
             std::cout << "  Track candidates (item) matching rate: "
-                      << 100. * float(n_matches) /
-                             std::max(track_candidates.size(),
-                                      track_candidates_alpaka.size())
+                      << 100. * static_cast<double>(n_matches) /
+                             static_cast<double>(
+                                 std::max(track_candidates.size(),
+                                          track_candidates_alpaka.size()))
                       << "%" << std::endl;
 
             // Compare tracks fitted on the host and on the device.
