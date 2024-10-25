@@ -10,18 +10,18 @@
 
 #include "../utils/barrier.hpp"
 #include "../utils/utils.hpp"
+#include "./kernels/build_tracks.hpp"
+#include "./kernels/fill_sort_keys.hpp"
+#include "./kernels/make_barcode_sequence.hpp"
+#include "./kernels/prune_tracks.hpp"
 #include "traccc/alpaka/utils/thread_id.hpp"
 #include "traccc/definitions/primitives.hpp"
 #include "traccc/definitions/qualifiers.hpp"
 #include "traccc/edm/device/sort_key.hpp"
 #include "traccc/finding/candidate_link.hpp"
 #include "traccc/finding/device/apply_interaction.hpp"
-#include "traccc/finding/device/build_tracks.hpp"
-#include "traccc/finding/device/fill_sort_keys.hpp"
 #include "traccc/finding/device/find_tracks.hpp"
-#include "traccc/finding/device/make_barcode_sequence.hpp"
 #include "traccc/finding/device/propagate_to_next_surface.hpp"
-#include "traccc/finding/device/prune_tracks.hpp"
 #include "traccc/utils/projections.hpp"
 
 // detray include(s).
@@ -50,17 +50,6 @@
 #include <vector>
 
 namespace traccc::alpaka {
-
-struct MakeBarcodeSequenceKernel {
-    template <typename TAcc>
-    ALPAKA_FN_ACC void operator()(
-        TAcc const& acc, device::make_barcode_sequence_payload payload) const {
-
-        int globalThreadIdx =
-            ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
-        device::make_barcode_sequence(globalThreadIdx, payload);
-    }
-};
 
 template <typename detector_t>
 struct ApplyInteractionKernel {
@@ -103,18 +92,6 @@ struct FindTracksKernel {
     }
 };
 
-struct FillSortKeysKernel {
-    template <typename TAcc>
-    ALPAKA_FN_ACC void operator()(
-        TAcc const& acc, device::fill_sort_keys_payload payload) const {
-
-        int globalThreadIdx =
-            ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
-
-        device::fill_sort_keys(globalThreadIdx, payload);
-    }
-};
-
 template <typename propagator_t, typename bfield_t>
 struct PropagateToNextSurfaceKernel {
     template <typename TAcc>
@@ -128,30 +105,6 @@ struct PropagateToNextSurfaceKernel {
 
         device::propagate_to_next_surface<propagator_t, bfield_t>(
             globalThreadIdx, cfg, payload);
-    }
-};
-
-struct BuildTracksKernel {
-    template <typename TAcc>
-    ALPAKA_FN_ACC void operator()(TAcc const& acc, const finding_config cfg,
-                                  device::build_tracks_payload payload) const {
-
-        int globalThreadIdx =
-            ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
-
-        device::build_tracks(globalThreadIdx, cfg, payload);
-    }
-};
-
-struct PruneTracksKernel {
-    template <typename TAcc>
-    ALPAKA_FN_ACC void operator()(TAcc const& acc,
-                                  device::prune_tracks_payload payload) const {
-
-        int globalThreadIdx =
-            ::alpaka::getIdx<::alpaka::Grid, ::alpaka::Threads>(acc)[0];
-
-        device::prune_tracks(globalThreadIdx, payload);
     }
 };
 
