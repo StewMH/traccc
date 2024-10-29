@@ -36,18 +36,18 @@ vecmem::data::vector_buffer<device::prefix_sum_element_t> make_prefix_sum_buff(
         sizes_sum_view = make_sum_result.view;
     const unsigned int totalSize = make_sum_result.totalSize;
 
+    if (totalSize == 0) {
+        return {0, mr.main};
+    }
+
     // Create buffer and view objects for prefix sum vector
     vecmem::data::vector_buffer<device::prefix_sum_element_t> prefix_sum_buff(
         totalSize, mr.main);
     copy.setup(prefix_sum_buff);
     auto data_prefix_sum_buff = vecmem::get_data(prefix_sum_buff);
 
-    // Setup Alpaka
-    auto const deviceProperties = ::alpaka::getAccDevProps<Acc>(
-        ::alpaka::getDevByIdx(::alpaka::Platform<Acc>{}, 0u));
-    const Idx threadsPerBlock = warpSize;
-
     // Fixed number of threads per block.
+    const Idx threadsPerBlock = warpSize;
     const Idx blocksPerGrid =
         (totalSize + threadsPerBlock - 1) / threadsPerBlock;
     auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);

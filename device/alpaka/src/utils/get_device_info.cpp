@@ -17,10 +17,8 @@
 namespace traccc::alpaka {
 
 void get_device_info() {
-    using Acc = ::alpaka::ExampleDefaultAcc<::alpaka::DimInt<1>, uint32_t>;
     int device = 0;
     auto devAcc = ::alpaka::getDevByIdx(::alpaka::Platform<Acc>{}, 0u);
-    auto const props = ::alpaka::getAccDevProps<Acc>(devAcc);
     std::cout << "Using Alpaka device: " << ::alpaka::getName(devAcc)
               << " [id: " << device << "] " << std::endl;
 }

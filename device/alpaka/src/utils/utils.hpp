@@ -8,7 +8,6 @@
 #pragma once
 
 #include <alpaka/alpaka.hpp>
-#include <alpaka/example/ExampleDefaultAcc.hpp>
 
 #ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
 #include <vecmem/utils/cuda/copy.hpp>
@@ -26,7 +25,14 @@ using Dim = ::alpaka::DimInt<1>;
 using Idx = uint32_t;
 using WorkDiv = ::alpaka::WorkDivMembers<Dim, Idx>;
 
-using Acc = ::alpaka::ExampleDefaultAcc<Dim, Idx>;
+#if defined(ALPAKA_ACC_GPU_CUDA_ENABLED)
+using Acc = ::alpaka::AccGpuCudaRt<Dim, Idx>;
+#elif defined(ALPAKA_ACC_GPU_HIP_ENABLED)
+using Acc = ::alpaka::AccGpuHipRt<Dim, Idx>;
+#else
+using Acc = ::alpaka::AccCpuThreads<Dim, Idx>;
+#endif
+
 using Host = ::alpaka::DevCpu;
 using Queue = ::alpaka::Queue<Acc, ::alpaka::Blocking>;
 
