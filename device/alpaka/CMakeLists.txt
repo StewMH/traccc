@@ -11,16 +11,12 @@ include( traccc-compiler-options-cpp )
 set(PUBLIC_LIBRARIES traccc::core traccc::device_common vecmem::core covfie::core)
 set(PRIVATE_LIBRARIES alpaka::alpaka traccc::Thrust)
 
-if(alpaka_ACC_GPU_CUDA_ENABLE)
-  enable_language(CUDA)
-  include( traccc-compiler-options-cuda )
+set (DEVICE_LIBRARIES)
 
-  list(APPEND PRIVATE_LIBRARIES CUDA::cudart vecmem::cuda)
-elseif(alpaka_ACC_GPU_HIP_ENABLE)
-  enable_language(HIP)
-  find_package( HIPToolkit REQUIRED )
-  list(APPEND PRIVATE_LIBRARIES HIP::hiprt vecmem::hip)
-endif()
+include (traccc-alpaka-functions)
+traccc_get_alpaka_vecmem_lib(DEVICE_LIBRARIES)
+traccc_get_alpaka_native_lib(DEVICE_LIBRARIES)
+
 
 traccc_add_alpaka_library( traccc_alpaka alpaka TYPE SHARED
   # Utility definitions.
@@ -45,4 +41,4 @@ traccc_add_alpaka_library( traccc_alpaka alpaka TYPE SHARED
   "src/seeding/track_params_estimation.cpp"
 )
 
-target_link_libraries(traccc_alpaka PUBLIC ${PUBLIC_LIBRARIES} PRIVATE ${PRIVATE_LIBRARIES})
+target_link_libraries(traccc_alpaka PUBLIC ${PUBLIC_LIBRARIES} PRIVATE ${PRIVATE_LIBRARIES} ${DEVICE_LIBRARIES})

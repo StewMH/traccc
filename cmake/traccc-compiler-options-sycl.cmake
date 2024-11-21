@@ -21,6 +21,7 @@ foreach( mode RELEASE RELWITHDEBINFO MINSIZEREL DEBUG )
    traccc_add_flag( CMAKE_SYCL_FLAGS_${mode} "-Wshadow" )
    traccc_add_flag( CMAKE_SYCL_FLAGS_${mode} "-Wunused-local-typedefs" )
    traccc_add_flag( CMAKE_SYCL_FLAGS_${mode} "-Wconversion" )
+   traccc_add_flag( CMAKE_SYCL_FLAGS_${mode} "-fsycl-fp64-conv-emu" )
 endforeach()
 
 if( NOT WIN32 )

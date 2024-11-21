@@ -9,16 +9,13 @@ set(TRACCC_ALPAKA_TEST_SOURCES
   test_cca.cpp
 )
 
-if(alpaka_ACC_GPU_CUDA_ENABLE)
-  enable_language(CUDA)
-  set_source_files_properties(${TRACCC_ALPAKA_TEST_SOURCES} PROPERTIES LANGUAGE CUDA)
-  include( traccc-compiler-options-cuda )
-  list(APPEND DEVICE_LIBRARIES vecmem::cuda)
-elseif(alpaka_ACC_GPU_HIP_ENABLE)
-  enable_language(HIP)
-  set_source_files_properties(${TRACCC_ALPAKA_TEST_SOURCES} PROPERTIES LANGUAGE HIP)
-  list(APPEND DEVICE_LIBRARIES vecmem::hip)
-endif()
+set (DEVICE_LIBRARIES)
+
+include (traccc-alpaka-functions)
+traccc_enable_alpaka_backend_lang(TRACCC_ALPAKA_TEST_SOURCES)
+traccc_get_alpaka_vecmem_lib(DEVICE_LIBRARIES)
+traccc_get_alpaka_native_lib(DEVICE_LIBRARIES)
+
 
 traccc_add_test( alpaka
    ${TRACCC_ALPAKA_TEST_SOURCES}

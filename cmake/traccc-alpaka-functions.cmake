@@ -9,6 +9,10 @@ cmake_minimum_required( VERSION 3.16 )
 # Guard against multiple includes.
 include_guard( GLOBAL )
 
+if( POLICY CMP0140 )
+   cmake_policy( SET CMP0140 NEW )
+endif()
+
 # Function for declaring the libraries of the project.
 # This version calls the alpaka_add_library() function to create the library,
 # which is setup to use the correct compiler flags depending on the build type.
@@ -67,3 +71,51 @@ function( traccc_add_alpaka_library fullname basename )
    endif()
 
 endfunction( traccc_add_alpaka_library )
+
+#Set a file to be parsed as the relevant device language and include relevant compiler options
+function(traccc_enable_alpaka_backend_lang source_files)
+if(alpaka_ACC_GPU_CUDA_ENABLE)
+  enable_language(CUDA)
+  include( traccc-compiler-options-cuda )
+  set_source_files_properties(${source_files} PROPERTIES LANGUAGE CUDA)
+
+elseif(alpaka_ACC_GPU_HIP_ENABLE)
+  enable_language(HIP)
+  find_package( HIPToolkit REQUIRED )
+  set_source_files_properties(${source_files} PROPERTIES LANGUAGE HIP)
+
+elseif(alpaka_ACC_SYCL_ENABLE)
+  enable_language(SYCL)
+  include( traccc-compiler-options-sycl )
+  set_source_files_properties(${source_files} PROPERTIES LANGUAGE SYCL)
+endif()
+endfunction(traccc_enable_alpaka_backend_lang)
+
+#Get relevant device version of vecmem
+function(traccc_get_alpaka_vecmem_lib vecmem_lib )
+  if(alpaka_ACC_GPU_CUDA_ENABLE)
+    list(APPEND ${vecmem_lib} vecmem::cuda)
+
+  elseif(alpaka_ACC_GPU_HIP_ENABLE)
+    list(APPEND ${vecmem_lib} vecmem::hip)
+ 
+  elseif(alpaka_ACC_SYCL_ENABLE)
+    list(APPEND ${vecmem_lib} vecmem::sycl)
+    message("vecmem_lib" "${vecmem_lib}")
+  endif()
+  #make sure contents of vecmem_lib get passed out of the function
+  return(PROPAGATE ${vecmem_lib})
+endfunction(traccc_get_alpaka_vecmem_lib)
+
+#Get relevant device libraries
+function(traccc_get_alpaka_native_lib native_lib )
+if(alpaka_ACC_GPU_CUDA_ENABLE)
+  list(APPEND ${native_lib} CUDA::cudart)
+
+elseif(alpaka_ACC_GPU_HIP_ENABLE)
+  list(APPEND ${native_lib} HIP::hiprt)
+endif()
+
+  #make sure contents of native_lib get passed out of the function
+  return(PROPAGATE ${native_lib})
+endfunction(traccc_get_alpaka_native_lib)

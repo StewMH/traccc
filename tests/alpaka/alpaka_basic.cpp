@@ -15,15 +15,7 @@
 #include <vecmem/memory/host_memory_resource.hpp>
 #include <vecmem/utils/copy.hpp>
 
-#if defined(ALPAKA_ACC_GPU_CUDA_ENABLED)
-#include <vecmem/memory/cuda/device_memory_resource.hpp>
-#include <vecmem/memory/cuda/host_memory_resource.hpp>
-#include <vecmem/utils/cuda/copy.hpp>
-#elif defined(ALPAKA_ACC_GPU_HIP_ENABLED)
-#include <vecmem/memory/hip/device_memory_resource.hpp>
-#include <vecmem/memory/hip/host_memory_resource.hpp>
-#include <vecmem/utils/hip/copy.hpp>
-#endif
+#include "traccc/alpaka/utils/vecmem_types.hpp"
 
 // GoogleTest include(s).
 #include <gtest/gtest.h>
@@ -139,17 +131,13 @@ GTEST_TEST(AlpakaBasic, VecMemOp) {
     using WorkDiv = WorkDivMembers<Dim, Idx>;
     auto workDiv = WorkDiv{blocksPerGrid, threadsPerBlock, elementsPerThread};
 
-    vecmem::host_memory_resource host_mr;
-#if defined(ALPAKA_ACC_GPU_CUDA_ENABLED)
-    vecmem::cuda::copy vm_copy;
-    vecmem::cuda::device_memory_resource device_mr;
-#elif defined(ALPAKA_ACC_GPU_HIP_ENABLED)
-    vecmem::hip::copy vm_copy;
-    vecmem::hip::device_memory_resource device_mr;
-#else
-    vecmem::copy vm_copy;
-    vecmem::host_memory_resource device_mr;
-#endif
+    traccc::alpaka::vecmem::host_device_types<
+      alpaka::trait::AccToTag<Acc>::type>::host_memory_resource host_mr;
+    traccc::alpaka::vecmem::host_device_types<
+      alpaka::trait::AccToTag<Acc>::type>::device_copy copy;
+    traccc::alpaka::vecmem::host_device_types<
+      alpaka::trait::AccToTag<Acc>::type>::device_memory_resource
+      device_mr;
 
     vecmem::vector<float> host_vector{n, &host_mr};
 
