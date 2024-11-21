@@ -132,12 +132,11 @@ GTEST_TEST(AlpakaBasic, VecMemOp) {
     auto workDiv = WorkDiv{blocksPerGrid, threadsPerBlock, elementsPerThread};
 
     traccc::alpaka::vecmem::host_device_types<
-      alpaka::trait::AccToTag<Acc>::type>::host_memory_resource host_mr;
+        alpaka::trait::AccToTag<Acc>::type>::host_memory_resource host_mr;
     traccc::alpaka::vecmem::host_device_types<
-      alpaka::trait::AccToTag<Acc>::type>::device_copy copy;
+        alpaka::trait::AccToTag<Acc>::type>::device_copy copy;
     traccc::alpaka::vecmem::host_device_types<
-      alpaka::trait::AccToTag<Acc>::type>::device_memory_resource
-      device_mr;
+        alpaka::trait::AccToTag<Acc>::type>::device_memory_resource device_mr;
 
     vecmem::vector<float> host_vector{n, &host_mr};
 
