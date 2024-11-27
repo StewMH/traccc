@@ -149,6 +149,20 @@ if( TRACCC_SETUP_EIGEN3 )
    endif()
 endif()
 
+# Set up TBB.
+option( TRACCC_SETUP_TBB
+   "Set up the TBB target(s) explicitly" TRUE )
+option( TRACCC_USE_SYSTEM_TBB
+   "Pick up an existing installation of TBB from the build environment"
+   ${TRACCC_USE_SYSTEM_LIBS} )
+if( TRACCC_SETUP_TBB )
+   if( TRACCC_USE_SYSTEM_TBB )
+      find_package( TBB REQUIRED )
+   else()
+      add_subdirectory( extern/tbb )
+   endif()
+endif()
+
 # Set up CCCL.
 option( TRACCC_SETUP_THRUST
    "Set up the Thrust target(s) explicitly" TRUE )
@@ -187,20 +201,6 @@ if( TRACCC_SETUP_ROCTHRUST )
    # Dress up the rocthrust target a little.
    target_compile_definitions( rocthrust INTERFACE
       THRUST_IGNORE_CUB_VERSION_CHECK )
-endif()
-
-# Set up TBB.
-option( TRACCC_SETUP_TBB
-   "Set up the TBB target(s) explicitly" TRUE )
-option( TRACCC_USE_SYSTEM_TBB
-   "Pick up an existing installation of TBB from the build environment"
-   ${TRACCC_USE_SYSTEM_LIBS} )
-if( TRACCC_SETUP_TBB )
-   if( TRACCC_USE_SYSTEM_TBB )
-      find_package( TBB REQUIRED )
-   else()
-      add_subdirectory( extern/tbb )
-   endif()
 endif()
 
 # Set up DPL if SYCL is built.
@@ -351,6 +351,21 @@ if( TRACCC_SETUP_BENCHMARKS )
    endif()
 endif()
 
+# Set up indicators.
+option( TRACCC_SETUP_INDICATORS
+   "Set up the indicators target(s) explicitly" ${TRACCC_BUILD_EXAMPLES} )
+option( TRACCC_USE_SYSTEM_INDICATORS
+   "Pick up an existing installation of indicators from the build environment"
+   ${TRACCC_USE_SYSTEM_LIBS} )
+if( TRACCC_SETUP_INDICATORS )
+   if( TRACCC_USE_SYSTEM_INDICATORS )
+      find_package( indicators REQUIRED )
+   else()
+      add_subdirectory( extern/indicators )
+   endif()
+endif()
+
+
 option( TRACCC_ENABLE_NVTX_PROFILING
         "Use instrument functions to enable fine grained profiling" FALSE )
 
@@ -384,7 +399,7 @@ add_subdirectory( plugins )
 
 if ( TRACCC_BUILD_EXAMPLES )
    # Find Boost.
-   find_package( Boost REQUIRED COMPONENTS program_options filesystem)
+   find_package( Boost CONFIG REQUIRED COMPONENTS program_options filesystem )
    if ( NOT TRACCC_BUILD_IO )
       message(FATAL_ERROR "traccc::io is disabled, but it is required to build the examples.")
    endif()
@@ -402,7 +417,7 @@ endif()
 # Set up the benchmark(s).
 if( TRACCC_BUILD_BENCHMARKS )
    # Find Boost.
-   find_package( Boost REQUIRED COMPONENTS filesystem)
+   find_package( Boost CONFIG REQUIRED COMPONENTS filesystem )
    if ( NOT TRACCC_BUILD_IO )
       message(FATAL_ERROR "traccc::io is disabled, but it is required to build the tests.")
    endif()

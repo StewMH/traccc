@@ -112,6 +112,10 @@ TEST_P(CudaCkfCombinatoricsTelescopeTests, Run) {
                                  writer_type>(
         ptc, n_events, host_det, field, std::move(generator),
         std::move(smearer_writer_cfg), full_path);
+    sim.get_config().propagation.navigation.overstep_tolerance =
+        -100.f * unit<float>::um;
+    sim.get_config().propagation.navigation.max_mask_tolerance =
+        1.f * unit<float>::mm;
     sim.run();
 
     /*****************************
@@ -140,12 +144,19 @@ TEST_P(CudaCkfCombinatoricsTelescopeTests, Run) {
     cfg_no_limit.ptc_hypothesis = ptc;
     cfg_no_limit.max_num_branches_per_seed = 100000;
     cfg_no_limit.chi2_max = 30.f;
+    cfg_no_limit.propagation.navigation.overstep_tolerance =
+        -100.f * unit<float>::um;
+    cfg_no_limit.propagation.navigation.max_mask_tolerance =
+        1.f * unit<float>::mm;
 
     typename traccc::cuda::finding_algorithm<
         rk_stepper_type, device_navigator_type>::config_type cfg_limit;
     cfg_limit.ptc_hypothesis = ptc;
     cfg_limit.max_num_branches_per_seed = 500;
     cfg_limit.chi2_max = 30.f;
+    cfg_limit.propagation.navigation.overstep_tolerance =
+        -100.f * unit<float>::um;
+    cfg_limit.propagation.navigation.max_mask_tolerance = 1.f * unit<float>::mm;
 
     // Finding algorithm object
     traccc::cuda::finding_algorithm<rk_stepper_type, device_navigator_type>
@@ -173,9 +184,10 @@ TEST_P(CudaCkfCombinatoricsTelescopeTests, Run) {
 
         traccc::bound_track_parameters_collection_types::buffer seeds_buffer{
             static_cast<unsigned int>(seeds.size()), mr.main};
-        copy.setup(seeds_buffer);
+        copy.setup(seeds_buffer)->wait();
         copy(vecmem::get_data(seeds), seeds_buffer,
-             vecmem::copy::type::host_to_device);
+             vecmem::copy::type::host_to_device)
+            ->wait();
 
         // Read measurements
         traccc::measurement_collection_types::host measurements_per_event{
@@ -184,20 +196,22 @@ TEST_P(CudaCkfCombinatoricsTelescopeTests, Run) {
 
         traccc::measurement_collection_types::buffer measurements_buffer(
             static_cast<unsigned int>(measurements_per_event.size()), mr.main);
-        copy(vecmem::get_data(measurements_per_event), measurements_buffer);
+        copy.setup(measurements_buffer)->wait();
+        copy(vecmem::get_data(measurements_per_event), measurements_buffer)
+            ->wait();
 
         // Instantiate output cuda containers/collections
         traccc::track_candidate_container_types::buffer
             track_candidates_cuda_buffer{{{}, *(mr.host)},
                                          {{}, *(mr.host), mr.host}};
-        copy.setup(track_candidates_cuda_buffer.headers);
-        copy.setup(track_candidates_cuda_buffer.items);
+        copy.setup(track_candidates_cuda_buffer.headers)->wait();
+        copy.setup(track_candidates_cuda_buffer.items)->wait();
 
         traccc::track_candidate_container_types::buffer
             track_candidates_limit_cuda_buffer{{{}, *(mr.host)},
                                                {{}, *(mr.host), mr.host}};
-        copy.setup(track_candidates_limit_cuda_buffer.headers);
-        copy.setup(track_candidates_limit_cuda_buffer.items);
+        copy.setup(track_candidates_limit_cuda_buffer.headers)->wait();
+        copy.setup(track_candidates_limit_cuda_buffer.items)->wait();
 
         // Run device finding
         track_candidates_cuda_buffer =
@@ -217,7 +231,7 @@ TEST_P(CudaCkfCombinatoricsTelescopeTests, Run) {
         ASSERT_TRUE(track_candidates_cuda.size() >
                     track_candidates_limit_cuda.size());
         ASSERT_EQ(track_candidates_cuda.size(),
-                  std::pow(n_truth_tracks, plane_positions.size() + 1));
+                  std::pow(n_truth_tracks, std::get<11>(GetParam()) + 1));
         ASSERT_EQ(track_candidates_limit_cuda.size(),
                   n_truth_tracks * cfg_limit.max_num_branches_per_seed);
     }
@@ -232,11 +246,13 @@ INSTANTIATE_TEST_SUITE_P(
                                       std::array<scalar, 2u>{100.f, 100.f},
                                       std::array<scalar, 2u>{0.f, 0.f},
                                       std::array<scalar, 2u>{0.f, 0.f},
-                                      detray::muon<scalar>(), 2, 1, false),
+                                      detray::muon<scalar>(), 2, 1, false, 20.f,
+                                      9u, 20.f),
                       std::make_tuple("telescope_combinatorics_trio",
                                       std::array<scalar, 3u>{0.f, 0.f, 0.f},
                                       std::array<scalar, 3u>{0.f, 0.f, 0.f},
                                       std::array<scalar, 2u>{100.f, 100.f},
                                       std::array<scalar, 2u>{0.f, 0.f},
                                       std::array<scalar, 2u>{0.f, 0.f},
-                                      detray::muon<scalar>(), 3, 1, false)));
+                                      detray::muon<scalar>(), 3, 1, false, 20.f,
+                                      9u, 20.f)));

@@ -9,9 +9,15 @@ include( traccc-alpaka-functions )
 
 set(EXTRA_LIBS)
 
+set(TRACCC_ALPAKA_EXAMPLE_SOURCES
+    seq_example_alpaka.cpp
+    seeding_example_alpaka.cpp
+)
+
 if(alpaka_ACC_GPU_CUDA_ENABLE)
   enable_language(CUDA)
   include( traccc-compiler-options-cuda )
+  set_source_files_properties(${TRACCC_ALPAKA_EXAMPLE_SOURCES} PROPERTIES LANGUAGE CUDA)
 
   list (APPEND EXTRA_LIBS CUDA::cudart vecmem::cuda)
 elseif(alpaka_ACC_GPU_HIP_ENABLE)
@@ -46,3 +52,10 @@ traccc_add_executable( throughput_st_alpaka "throughput_st.cpp"
 traccc_add_executable( throughput_mt_alpaka "throughput_mt.cpp"
    LINK_LIBRARIES TBB::tbb ${LIBRARIES} ${DETRAY} traccc_examples_alpaka )
 
+#Can only do this once target is defined, so need another if here
+if(alpaka_ACC_GPU_HIP_ENABLE)
+  set_target_properties( traccc_seq_example_alpaka PROPERTIES
+     POSITION_INDEPENDENT_CODE TRUE )
+  set_target_properties( traccc_seeding_example_alpaka PROPERTIES
+     POSITION_INDEPENDENT_CODE TRUE )
+endif()

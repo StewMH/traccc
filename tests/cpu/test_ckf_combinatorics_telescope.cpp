@@ -6,8 +6,7 @@
  */
 
 // Project include(s).
-#include "traccc/finding/ckf_algorithm.hpp"
-#include "traccc/fitting/fitting_algorithm.hpp"
+#include "traccc/finding/combinatorial_kalman_filter_algorithm.hpp"
 #include "traccc/io/read_measurements.hpp"
 #include "traccc/io/utils.hpp"
 #include "traccc/resolution/fitting_performance_writer.hpp"
@@ -101,6 +100,10 @@ TEST_P(CpuCkfCombinatoricsTelescopeTests, Run) {
                                  writer_type>(
         std::get<6>(GetParam()), n_events, host_det, field,
         std::move(generator), std::move(smearer_writer_cfg), full_path);
+    sim.get_config().propagation.navigation.overstep_tolerance =
+        -100.f * unit<float>::um;
+    sim.get_config().propagation.navigation.max_mask_tolerance =
+        1.f * unit<float>::mm;
     sim.run();
 
     /*****************************
@@ -115,14 +118,23 @@ TEST_P(CpuCkfCombinatoricsTelescopeTests, Run) {
     cfg_no_limit.max_num_branches_per_seed =
         std::numeric_limits<unsigned int>::max();
     cfg_no_limit.chi2_max = 30.f;
+    cfg_no_limit.propagation.navigation.overstep_tolerance =
+        -100.f * unit<float>::um;
+    cfg_no_limit.propagation.navigation.max_mask_tolerance =
+        1.f * unit<float>::mm;
 
     traccc::finding_config cfg_limit;
     cfg_limit.max_num_branches_per_seed = 500;
     cfg_limit.chi2_max = 30.f;
+    cfg_limit.propagation.navigation.overstep_tolerance =
+        -100.f * unit<float>::um;
+    cfg_limit.propagation.navigation.max_mask_tolerance = 1.f * unit<float>::mm;
 
     // Finding algorithm object
-    traccc::host::ckf_algorithm host_finding(cfg_no_limit);
-    traccc::host::ckf_algorithm host_finding_limit(cfg_limit);
+    traccc::host::combinatorial_kalman_filter_algorithm host_finding(
+        cfg_no_limit);
+    traccc::host::combinatorial_kalman_filter_algorithm host_finding_limit(
+        cfg_limit);
 
     // Iterate over events
     for (std::size_t i_evt = 0; i_evt < n_events; i_evt++) {
@@ -160,7 +172,7 @@ TEST_P(CpuCkfCombinatoricsTelescopeTests, Run) {
         // Make sure that the number of found tracks = n_track ^ (n_planes + 1)
         ASSERT_TRUE(track_candidates.size() > track_candidates_limit.size());
         ASSERT_EQ(track_candidates.size(),
-                  std::pow(n_truth_tracks, plane_positions.size() + 1));
+                  std::pow(n_truth_tracks, std::get<11>(GetParam()) + 1));
         ASSERT_EQ(track_candidates_limit.size(),
                   n_truth_tracks * cfg_limit.max_num_branches_per_seed);
     }
@@ -169,21 +181,19 @@ TEST_P(CpuCkfCombinatoricsTelescopeTests, Run) {
 // Testing two identical tracks
 INSTANTIATE_TEST_SUITE_P(
     CpuCkfCombinatoricsTelescopeValidation0, CpuCkfCombinatoricsTelescopeTests,
-    ::testing::Values(std::make_tuple("telescope_combinatorics_twin",
-                                      std::array<scalar, 3u>{0.f, 0.f, 0.f},
-                                      std::array<scalar, 3u>{0.f, 0.f, 0.f},
-                                      std::array<scalar, 2u>{100.f, 100.f},
-                                      std::array<scalar, 2u>{0.f, 0.f},
-                                      std::array<scalar, 2u>{0.f, 0.f},
-                                      detray::muon<scalar>(), 2, 1, false)));
+    ::testing::Values(std::make_tuple(
+        "telescope_combinatorics_twin", std::array<scalar, 3u>{0.f, 0.f, 0.f},
+        std::array<scalar, 3u>{0.f, 0.f, 0.f},
+        std::array<scalar, 2u>{100.f, 100.f}, std::array<scalar, 2u>{0.f, 0.f},
+        std::array<scalar, 2u>{0.f, 0.f}, detray::muon<scalar>(), 2, 1, false,
+        20.f, 9u, 20.f)));
 
 // Testing three identical tracks
 INSTANTIATE_TEST_SUITE_P(
     CpuCkfCombinatoricsTelescopeValidation1, CpuCkfCombinatoricsTelescopeTests,
-    ::testing::Values(std::make_tuple("telescope_combinatorics_trio",
-                                      std::array<scalar, 3u>{0.f, 0.f, 0.f},
-                                      std::array<scalar, 3u>{0.f, 0.f, 0.f},
-                                      std::array<scalar, 2u>{100.f, 100.f},
-                                      std::array<scalar, 2u>{0.f, 0.f},
-                                      std::array<scalar, 2u>{0.f, 0.f},
-                                      detray::muon<scalar>(), 3, 1, false)));
+    ::testing::Values(std::make_tuple(
+        "telescope_combinatorics_trio", std::array<scalar, 3u>{0.f, 0.f, 0.f},
+        std::array<scalar, 3u>{0.f, 0.f, 0.f},
+        std::array<scalar, 2u>{100.f, 100.f}, std::array<scalar, 2u>{0.f, 0.f},
+        std::array<scalar, 2u>{0.f, 0.f}, detray::muon<scalar>(), 3, 1, false,
+        20.f, 9u, 20.f)));

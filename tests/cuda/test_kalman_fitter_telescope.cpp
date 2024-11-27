@@ -10,7 +10,6 @@
 #include "traccc/device/container_d2h_copy_alg.hpp"
 #include "traccc/device/container_h2d_copy_alg.hpp"
 #include "traccc/edm/track_state.hpp"
-#include "traccc/fitting/fitting_algorithm.hpp"
 #include "traccc/io/utils.hpp"
 #include "traccc/performance/details/is_same_object.hpp"
 #include "traccc/resolution/fitting_performance_writer.hpp"
@@ -120,6 +119,10 @@ TEST_P(KalmanFittingTelescopeTests, Run) {
                                  writer_type>(
         ptc, n_events, host_det, field, std::move(generator),
         std::move(smearer_writer_cfg), full_path);
+    sim.get_config().propagation.navigation.overstep_tolerance =
+        -100.f * unit<float>::um;
+    sim.get_config().propagation.navigation.max_mask_tolerance =
+        1.f * unit<float>::mm;
     sim.run();
 
     /***************
@@ -146,6 +149,9 @@ TEST_P(KalmanFittingTelescopeTests, Run) {
     typename traccc::cuda::fitting_algorithm<device_fitter_type>::config_type
         fit_cfg;
     fit_cfg.ptc_hypothesis = ptc;
+    fit_cfg.propagation.navigation.overstep_tolerance =
+        -100.f * unit<float>::um;
+    fit_cfg.propagation.navigation.max_mask_tolerance = 1.f * unit<float>::mm;
     traccc::cuda::fitting_algorithm<device_fitter_type> device_fitting(
         fit_cfg, mr, copy, stream);
 
@@ -216,38 +222,41 @@ TEST_P(KalmanFittingTelescopeTests, Run) {
 INSTANTIATE_TEST_SUITE_P(
     CUDAKalmanFitTelescopeValidation, KalmanFittingTelescopeTests,
     ::testing::Values(
-        std::make_tuple("cuda_telescope_1_GeV_0_phi",
-                        std::array<scalar, 3u>{0.f, 0.f, 0.f},
-                        std::array<scalar, 3u>{0.f, 0.f, 0.f},
-                        std::array<scalar, 2u>{1.f, 1.f},
-                        std::array<scalar, 2u>{0.f, 0.f},
-                        std::array<scalar, 2u>{0.f, 0.f},
-                        detray::muon<scalar>(), 100, 100, false),
+        std::make_tuple(
+            "cuda_telescope_1_GeV_0_phi", std::array<scalar, 3u>{0.f, 0.f, 0.f},
+            std::array<scalar, 3u>{0.f, 0.f, 0.f},
+            std::array<scalar, 2u>{1.f, 1.f}, std::array<scalar, 2u>{0.f, 0.f},
+            std::array<scalar, 2u>{0.f, 0.f}, detray::muon<scalar>(), 100, 100,
+            false, 20.f, 9u, 20.f),
         std::make_tuple("cuda_telescope_10_GeV_0_phi",
                         std::array<scalar, 3u>{0.f, 0.f, 0.f},
                         std::array<scalar, 3u>{0.f, 0.f, 0.f},
                         std::array<scalar, 2u>{10.f, 10.f},
                         std::array<scalar, 2u>{0.f, 0.f},
                         std::array<scalar, 2u>{0.f, 0.f},
-                        detray::muon<scalar>(), 100, 100, false),
+                        detray::muon<scalar>(), 100, 100, false, 20.f, 9u,
+                        20.f),
         std::make_tuple("cuda_telescope_100_GeV_0_phi",
                         std::array<scalar, 3u>{0.f, 0.f, 0.f},
                         std::array<scalar, 3u>{0.f, 0.f, 0.f},
                         std::array<scalar, 2u>{100.f, 100.f},
                         std::array<scalar, 2u>{0.f, 0.f},
                         std::array<scalar, 2u>{0.f, 0.f},
-                        detray::muon<scalar>(), 100, 100, false),
+                        detray::muon<scalar>(), 100, 100, false, 20.f, 9u,
+                        20.f),
         std::make_tuple("cuda_telescope_1_GeV_0_phi_antimuon",
                         std::array<scalar, 3u>{0.f, 0.f, 0.f},
                         std::array<scalar, 3u>{0.f, 0.f, 0.f},
                         std::array<scalar, 2u>{1.f, 1.f},
                         std::array<scalar, 2u>{0.f, 0.f},
                         std::array<scalar, 2u>{0.f, 0.f},
-                        detray::antimuon<scalar>(), 100, 100, false),
+                        detray::antimuon<scalar>(), 100, 100, false, 20.f, 9u,
+                        20.f),
         std::make_tuple("cuda_telescope_1_GeV_0_phi_random_charge",
                         std::array<scalar, 3u>{0.f, 0.f, 0.f},
                         std::array<scalar, 3u>{0.f, 0.f, 0.f},
                         std::array<scalar, 2u>{1.f, 1.f},
                         std::array<scalar, 2u>{0.f, 0.f},
                         std::array<scalar, 2u>{0.f, 0.f},
-                        detray::muon<scalar>(), 100, 100, true)));
+                        detray::muon<scalar>(), 100, 100, true, 20.f, 9u,
+                        20.f)));

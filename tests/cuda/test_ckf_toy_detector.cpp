@@ -9,7 +9,7 @@
 #include "traccc/cuda/finding/finding_algorithm.hpp"
 #include "traccc/device/container_d2h_copy_alg.hpp"
 #include "traccc/device/container_h2d_copy_alg.hpp"
-#include "traccc/finding/ckf_algorithm.hpp"
+#include "traccc/finding/combinatorial_kalman_filter_algorithm.hpp"
 #include "traccc/io/read_measurements.hpp"
 #include "traccc/io/utils.hpp"
 #include "traccc/performance/container_comparator.hpp"
@@ -143,7 +143,7 @@ TEST_P(CkfToyDetectorTests, Run) {
     cfg.propagation.navigation.search_window = search_window;
 
     // Finding algorithm object
-    traccc::host::ckf_algorithm host_finding(cfg);
+    traccc::host::combinatorial_kalman_filter_algorithm host_finding(cfg);
 
     // Finding algorithm object
     traccc::cuda::finding_algorithm<rk_stepper_type, device_navigator_type>
@@ -169,9 +169,10 @@ TEST_P(CkfToyDetectorTests, Run) {
 
         traccc::bound_track_parameters_collection_types::buffer seeds_buffer{
             static_cast<unsigned int>(seeds.size()), mr.main};
-        copy.setup(seeds_buffer);
+        copy.setup(seeds_buffer)->wait();
         copy(vecmem::get_data(seeds), seeds_buffer,
-             vecmem::copy::type::host_to_device);
+             vecmem::copy::type::host_to_device)
+            ->wait();
 
         // Read measurements
         traccc::measurement_collection_types::host measurements_per_event{
@@ -180,14 +181,16 @@ TEST_P(CkfToyDetectorTests, Run) {
 
         traccc::measurement_collection_types::buffer measurements_buffer(
             static_cast<unsigned int>(measurements_per_event.size()), mr.main);
-        copy(vecmem::get_data(measurements_per_event), measurements_buffer);
+        copy.setup(measurements_buffer)->wait();
+        copy(vecmem::get_data(measurements_per_event), measurements_buffer)
+            ->wait();
 
         // Instantiate output cuda containers/collections
         traccc::track_candidate_container_types::buffer
             track_candidates_cuda_buffer{{{}, *(mr.host)},
                                          {{}, *(mr.host), mr.host}};
-        copy.setup(track_candidates_cuda_buffer.headers);
-        copy.setup(track_candidates_cuda_buffer.items);
+        copy.setup(track_candidates_cuda_buffer.headers)->wait();
+        copy.setup(track_candidates_cuda_buffer.items)->wait();
 
         // Run host finding
         auto track_candidates = host_finding(

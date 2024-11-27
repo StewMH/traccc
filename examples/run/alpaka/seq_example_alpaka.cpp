@@ -6,6 +6,7 @@
  */
 
 // Project include(s).
+#include "alpaka/example/ExampleDefaultAcc.hpp"
 #include "traccc/alpaka/clusterization/clusterization_algorithm.hpp"
 #include "traccc/alpaka/clusterization/measurement_sorting_algorithm.hpp"
 #include "traccc/alpaka/finding/finding_algorithm.hpp"
@@ -13,6 +14,7 @@
 #include "traccc/alpaka/seeding/seeding_algorithm.hpp"
 #include "traccc/alpaka/seeding/spacepoint_formation_algorithm.hpp"
 #include "traccc/alpaka/seeding/track_params_estimation.hpp"
+#include "traccc/alpaka/utils/vecmem_types.hpp"
 #include "traccc/clusterization/clusterization_algorithm.hpp"
 #include "traccc/device/container_d2h_copy_alg.hpp"
 #include "traccc/efficiency/seeding_performance_writer.hpp"
@@ -45,22 +47,6 @@
 #include "detray/navigation/navigator.hpp"
 #include "detray/propagator/propagator.hpp"
 #include "detray/propagator/rk_stepper.hpp"
-
-// VecMem include(s).
-#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
-#include <vecmem/memory/cuda/device_memory_resource.hpp>
-#include <vecmem/memory/cuda/host_memory_resource.hpp>
-#include <vecmem/utils/cuda/copy.hpp>
-#endif
-
-#ifdef ALPAKA_ACC_GPU_HIP_ENABLED
-#include <vecmem/memory/hip/device_memory_resource.hpp>
-#include <vecmem/memory/hip/host_memory_resource.hpp>
-#include <vecmem/utils/hip/copy.hpp>
-#endif
-
-#include <vecmem/memory/host_memory_resource.hpp>
-#include <vecmem/utils/copy.hpp>
 
 // System include(s).
 #include <exception>
@@ -109,7 +95,7 @@ int seq_run(const traccc::opts::detector& detector_opts,
         static_cast<traccc::silicon_detector_description::buffer::size_type>(
             host_det_descr.size()),
         mr.main};
-    copy(host_det_descr_data, device_det_descr);
+    copy(host_det_descr_data, device_det_descr)->wait();
 
     // Construct a Detray detector object, if supported by the configuration.
     traccc::default_detector::host host_detector{host_mr};
@@ -241,9 +227,11 @@ int seq_run(const traccc::opts::detector& detector_opts,
                 traccc::performance::timer t("File reading  (cpu)",
                                              elapsedTimes);
                 // Read the cells from the relevant event file into host memory.
+                static constexpr bool DEDUPLICATE = true;
                 traccc::io::read_cells(cells_per_event, event,
                                        input_opts.directory, &host_det_descr,
-                                       input_opts.format);
+                                       input_opts.format, DEDUPLICATE,
+                                       input_opts.use_acts_geom_source);
             }  // stop measuring file reading timer
 
             n_cells += cells_per_event.size();
@@ -251,7 +239,7 @@ int seq_run(const traccc::opts::detector& detector_opts,
             // Create device copy of input collections
             traccc::edm::silicon_cell_collection::buffer cells_buffer(
                 static_cast<unsigned int>(cells_per_event.size()), mr.main);
-            copy(vecmem::get_data(cells_per_event), cells_buffer);
+            copy(vecmem::get_data(cells_per_event), cells_buffer)->wait();
 
             // Alpaka
             {

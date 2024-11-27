@@ -39,6 +39,7 @@
 #include "traccc/seeding/track_params_estimation.hpp"
 
 // Detray include(s).
+#include "alpaka/example/ExampleDefaultAcc.hpp"
 #include "detray/core/detector.hpp"
 #include "detray/core/detector_metadata.hpp"
 #include "detray/detectors/bfield.hpp"
@@ -46,24 +47,7 @@
 #include "detray/navigation/navigator.hpp"
 #include "detray/propagator/propagator.hpp"
 #include "detray/propagator/rk_stepper.hpp"
-
-// VecMem include(s).
-#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
-#include <vecmem/memory/cuda/device_memory_resource.hpp>
-#include <vecmem/memory/cuda/host_memory_resource.hpp>
-#include <vecmem/memory/cuda/managed_memory_resource.hpp>
-#include <vecmem/utils/cuda/copy.hpp>
-#endif
-
-#ifdef ALPAKA_ACC_GPU_HIP_ENABLED
-#include <vecmem/memory/hip/device_memory_resource.hpp>
-#include <vecmem/memory/hip/host_memory_resource.hpp>
-#include <vecmem/memory/hip/managed_memory_resource.hpp>
-#include <vecmem/utils/hip/copy.hpp>
-#endif
-
-#include <vecmem/memory/host_memory_resource.hpp>
-#include <vecmem/utils/copy.hpp>
+#include "traccc/alpaka/utils/vecmem_types.hpp"
 
 // System include(s).
 #include <exception>
@@ -108,12 +92,6 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
     vecmem::hip::device_memory_resource device_mr;
     vecmem::hip::managed_memory_resource mng_mr;
     traccc::memory_resource mr{device_mr, &host_mr};
-#else
-    vecmem::copy copy;
-    vecmem::host_memory_resource host_mr;
-    vecmem::host_memory_resource mng_mr;
-    traccc::memory_resource mr{host_mr, &host_mr};
-#endif
 
     // Performance writer
     traccc::seeding_performance_writer sd_performance_writer(
@@ -264,7 +242,8 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
                     static_cast<unsigned int>(spacepoints_per_event.size()),
                     mr.main);
             copy(vecmem::get_data(spacepoints_per_event),
-                 spacepoints_alpaka_buffer);
+                 spacepoints_alpaka_buffer)
+                ->wait();
 
             traccc::measurement_collection_types::buffer
                 measurements_alpaka_buffer(
@@ -359,8 +338,8 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
         // Copy the seeds to the host for comparisons
         traccc::seed_collection_types::host seeds_alpaka;
         traccc::bound_track_parameters_collection_types::host params_alpaka;
-        copy(seeds_alpaka_buffer, seeds_alpaka);
-        copy(params_alpaka_buffer, params_alpaka);
+        copy(seeds_alpaka_buffer, seeds_alpaka)->wait();
+        copy(params_alpaka_buffer, params_alpaka)->wait();
 
         // Copy track candidates from device to host
         traccc::track_candidate_container_types::host track_candidates_alpaka =

@@ -8,7 +8,7 @@
 // Traccc include(s).
 #include "traccc/definitions/common.hpp"
 #include "traccc/finding/finding_config.hpp"
-#include "traccc/fitting/fitting_algorithm.hpp"
+#include "traccc/fitting/fitting_config.hpp"
 #include "traccc/io/utils.hpp"
 #include "traccc/seeding/seeding_algorithm.hpp"
 #include "traccc/seeding/track_params_estimation.hpp"
@@ -129,7 +129,7 @@ class ToyDetectorBenchmark : public benchmark::Fixture {
 
         // Set constrained step size to 1 mm
         sim.get_config().propagation.stepping.step_constraint =
-            1.f * detray::unit<traccc::scalar>::mm;
+            1.f * detray::unit<float>::mm;
 
         sim.run();
 
