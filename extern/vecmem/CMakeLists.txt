@@ -27,5 +27,18 @@ FetchContent_Declare( VecMem ${TRACCC_VECMEM_SOURCE} )
 set( VECMEM_BUILD_TESTING FALSE CACHE BOOL
    "Turn off the build of the VecMem unit tests" )
 
+# Check the options VecMem is built with, and declare appropriate options in TRACCC.
+if( VECMEM_BUILD_CUDA_LIBRARY )
+   set ( TRACCC_VECMEM_HAS_CUDA TRUE )
+endif()
+
+if ( VECMEM_BUILD_HIP_LIBRARY )
+   set ( TRACCC_VECMEM_HAS_HIP TRUE )
+endif()
+
+if ( VECMEM_BUILD_SYCL_LIBRARY )
+   set ( TRACCC_VECMEM_HAS_SYCL TRUE )
+endif()
+
 # Get it into the current directory.
 FetchContent_MakeAvailable( VecMem )

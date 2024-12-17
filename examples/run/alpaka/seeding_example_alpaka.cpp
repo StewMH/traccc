@@ -10,6 +10,7 @@
 #include "traccc/alpaka/fitting/fitting_algorithm.hpp"
 #include "traccc/alpaka/seeding/seeding_algorithm.hpp"
 #include "traccc/alpaka/seeding/track_params_estimation.hpp"
+#include "traccc/alpaka/utils/get_vecmem_resource.hpp"
 #include "traccc/definitions/common.hpp"
 #include "traccc/device/container_d2h_copy_alg.hpp"
 #include "traccc/device/container_h2d_copy_alg.hpp"
@@ -17,8 +18,9 @@
 #include "traccc/efficiency/nseed_performance_writer.hpp"
 #include "traccc/efficiency/seeding_performance_writer.hpp"
 #include "traccc/efficiency/track_filter.hpp"
-#include "traccc/finding/ckf_algorithm.hpp"
-#include "traccc/fitting/fitting_algorithm.hpp"
+#include "traccc/finding/combinatorial_kalman_filter_algorithm.hpp"
+#include "traccc/fitting/kalman_filter/kalman_fitter.hpp"
+#include "traccc/fitting/kalman_fitting_algorithm.hpp"
 #include "traccc/io/read_detector.hpp"
 #include "traccc/io/read_detector_description.hpp"
 #include "traccc/io/read_measurements.hpp"
@@ -39,7 +41,6 @@
 #include "traccc/seeding/track_params_estimation.hpp"
 
 // Detray include(s).
-#include "alpaka/example/ExampleDefaultAcc.hpp"
 #include "detray/core/detector.hpp"
 #include "detray/core/detector_metadata.hpp"
 #include "detray/detectors/bfield.hpp"
@@ -47,7 +48,6 @@
 #include "detray/navigation/navigator.hpp"
 #include "detray/propagator/propagator.hpp"
 #include "detray/propagator/rk_stepper.hpp"
-#include "traccc/alpaka/utils/vecmem_types.hpp"
 
 // System include(s).
 #include <exception>
@@ -80,17 +80,10 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
         traccc::kalman_fitter<rk_stepper_type, device_navigator_type>;
 
     // Memory resources used by the application.
-#if defined(ALPAKA_ACC_GPU_CUDA_ENABLED)
-    vecmem::cuda::copy copy;
-    vecmem::cuda::host_memory_resource host_mr;
-    vecmem::cuda::device_memory_resource device_mr;
-    vecmem::cuda::managed_memory_resource mng_mr;
-    traccc::memory_resource mr{device_mr, &host_mr};
-#elif defined(ALPAKA_ACC_GPU_HIP_ENABLED)
-    vecmem::hip::copy copy;
-    vecmem::hip::host_memory_resource host_mr;
-    vecmem::hip::device_memory_resource device_mr;
-    vecmem::hip::managed_memory_resource mng_mr;
+    traccc::alpaka::vecmem_resource::device_copy copy;
+    traccc::alpaka::vecmem_resource::host_memory_resource host_mr;
+    traccc::alpaka::vecmem_resource::device_memory_resource device_mr;
+    traccc::alpaka::vecmem_resource::managed_memory_resource mng_mr;
     traccc::memory_resource mr{device_mr, &host_mr};
 
     // Performance writer
@@ -167,15 +160,15 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
     cfg.propagation = propagation_config;
 
     // Finding algorithm object
-    traccc::host::ckf_algorithm host_finding(cfg);
+    traccc::host::combinatorial_kalman_filter_algorithm host_finding(cfg);
     traccc::alpaka::finding_algorithm<rk_stepper_type, device_navigator_type>
         device_finding(cfg, mr, copy);
 
     // Fitting algorithm object
-    typename traccc::fitting_algorithm<host_fitter_type>::config_type fit_cfg;
+    traccc::fitting_config fit_cfg;
     fit_cfg.propagation = propagation_config;
 
-    traccc::fitting_algorithm<host_fitter_type> host_fitting(fit_cfg);
+    traccc::host::kalman_fitting_algorithm host_fitting(fit_cfg, host_mr);
     traccc::alpaka::fitting_algorithm<device_fitter_type> device_fitting(
         fit_cfg, mr, copy);
 
@@ -326,7 +319,8 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
             if (accelerator_opts.compare_with_cpu) {
                 traccc::performance::timer t("Track fitting with KF (cpu)",
                                              elapsedTimes);
-                track_states = host_fitting(host_det, field, track_candidates);
+                track_states = host_fitting(host_det, field,
+                                            traccc::get_data(track_candidates));
             }
 
         }  // Stop measuring wall time

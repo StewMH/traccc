@@ -5,8 +5,8 @@
  * Mozilla Public License Version 2.0
  */
 
+
 // Project include(s).
-#include "alpaka/example/ExampleDefaultAcc.hpp"
 #include "traccc/alpaka/clusterization/clusterization_algorithm.hpp"
 #include "traccc/alpaka/clusterization/measurement_sorting_algorithm.hpp"
 #include "traccc/alpaka/finding/finding_algorithm.hpp"
@@ -14,12 +14,13 @@
 #include "traccc/alpaka/seeding/seeding_algorithm.hpp"
 #include "traccc/alpaka/seeding/spacepoint_formation_algorithm.hpp"
 #include "traccc/alpaka/seeding/track_params_estimation.hpp"
-#include "traccc/alpaka/utils/vecmem_types.hpp"
+#include "traccc/alpaka/utils/get_vecmem_resource.hpp"
 #include "traccc/clusterization/clusterization_algorithm.hpp"
 #include "traccc/device/container_d2h_copy_alg.hpp"
 #include "traccc/efficiency/seeding_performance_writer.hpp"
-#include "traccc/finding/ckf_algorithm.hpp"
-#include "traccc/fitting/fitting_algorithm.hpp"
+#include "traccc/finding/combinatorial_kalman_filter_algorithm.hpp"
+#include "traccc/fitting/kalman_filter/kalman_fitter.hpp"
+#include "traccc/fitting/kalman_fitting_algorithm.hpp"
 #include "traccc/io/read_cells.hpp"
 #include "traccc/io/read_detector.hpp"
 #include "traccc/io/read_detector_description.hpp"
@@ -66,21 +67,10 @@ int seq_run(const traccc::opts::detector& detector_opts,
             const traccc::opts::accelerator& accelerator_opts) {
 
     // Memory resources used by the application.
-    vecmem::host_memory_resource host_mr;
-#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
-    vecmem::cuda::copy copy;
-    vecmem::cuda::host_memory_resource cuda_host_mr;
-    vecmem::cuda::device_memory_resource device_mr;
-    traccc::memory_resource mr{device_mr, &cuda_host_mr};
-#elif ALPAKA_ACC_GPU_HIP_ENABLED
-    vecmem::hip::copy copy;
-    vecmem::hip::host_memory_resource hip_host_mr;
-    vecmem::hip::device_memory_resource device_mr;
-    traccc::memory_resource mr{device_mr, &hip_host_mr};
-#else
-    vecmem::copy copy;
-    traccc::memory_resource mr{host_mr, &host_mr};
-#endif
+    traccc::alpaka::vecmem_resource::host_memory_resource host_mr;
+    traccc::alpaka::vecmem_resource::device_memory_resource device_mr;
+    traccc::alpaka::vecmem_resource::device_copy copy;
+    traccc::memory_resource mr{device_mr, &host_mr};
 
     // Construct the detector description object.
     traccc::silicon_detector_description::host host_det_descr{host_mr};
@@ -133,17 +123,15 @@ int seq_run(const traccc::opts::detector& detector_opts,
         detray::rk_stepper<detray::bfield::const_field_t::view_t,
                            traccc::default_detector::host::algebra_type,
                            detray::constrained_step<>>;
-    using host_navigator_type =
-        detray::navigator<const traccc::default_detector::host>;
     using device_navigator_type =
         detray::navigator<const traccc::default_detector::device>;
 
-    using host_finding_algorithm = traccc::host::ckf_algorithm;
+    using host_finding_algorithm =
+        traccc::host::combinatorial_kalman_filter_algorithm;
     using device_finding_algorithm =
         traccc::alpaka::finding_algorithm<stepper_type, device_navigator_type>;
 
-    using host_fitting_algorithm = traccc::fitting_algorithm<
-        traccc::kalman_fitter<stepper_type, host_navigator_type>>;
+    using host_fitting_algorithm = traccc::host::kalman_fitting_algorithm;
     using device_fitting_algorithm = traccc::alpaka::fitting_algorithm<
         traccc::kalman_fitter<stepper_type, device_navigator_type>>;
 
@@ -169,7 +157,7 @@ int seq_run(const traccc::opts::detector& detector_opts,
                                  seeding_opts.seedfilter, host_mr);
     traccc::track_params_estimation tp(host_mr);
     host_finding_algorithm finding_alg(finding_cfg);
-    host_fitting_algorithm fitting_alg(fitting_cfg);
+    host_fitting_algorithm fitting_alg(fitting_cfg, host_mr);
 
     traccc::alpaka::clusterization_algorithm ca_alpaka(mr, copy,
                                                        clusterization_opts);
@@ -342,7 +330,8 @@ int seq_run(const traccc::opts::detector& detector_opts,
                     traccc::performance::timer timer{"Track fitting (cpu)",
                                                      elapsedTimes};
                     track_states =
-                        fitting_alg(host_detector, field, track_candidates);
+                        fitting_alg(host_detector, field,
+                                    traccc::get_data(track_candidates));
                 }
             }
         }  // Stop measuring wall time

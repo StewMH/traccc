@@ -16,6 +16,7 @@
 #include "traccc/alpaka/seeding/spacepoint_formation_algorithm.hpp"
 #include "traccc/alpaka/seeding/track_params_estimation.hpp"
 #include "traccc/alpaka/utils/get_device_info.hpp"
+#include "traccc/alpaka/utils/get_vecmem_resource.hpp"
 #include "traccc/clusterization/clustering_config.hpp"
 #include "traccc/edm/silicon_cell_collection.hpp"
 #include "traccc/edm/track_state.hpp"
@@ -32,20 +33,8 @@
 #include "detray/propagator/rk_stepper.hpp"
 
 // VecMem include(s).
-#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
-#include <vecmem/memory/cuda/device_memory_resource.hpp>
-#include <vecmem/utils/cuda/copy.hpp>
-#endif
-
-#ifdef ALPAKA_ACC_GPU_HIP_ENABLED
-#include <vecmem/memory/hip/device_memory_resource.hpp>
-#include <vecmem/utils/hip/copy.hpp>
-#endif
-
 #include <vecmem/containers/vector.hpp>
 #include <vecmem/memory/binary_page_memory_resource.hpp>
-#include <vecmem/memory/memory_resource.hpp>
-#include <vecmem/utils/copy.hpp>
 
 // System include(s).
 #include <memory>
@@ -130,22 +119,10 @@ class full_chain_algorithm
     private:
     /// Host memory resource
     vecmem::memory_resource& m_host_mr;
-#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
     /// Device memory resource
-    vecmem::cuda::device_memory_resource m_device_mr;
+    traccc::alpaka::vecmem_resource::device_memory_resource& m_device_mr;
     /// Memory copy object
-    vecmem::cuda::copy m_copy;
-#elif ALPAKA_ACC_GPU_HIP_ENABLED
-    /// Device memory resource
-    vecmem::hip::device_memory_resource m_device_mr;
-    /// Memory copy object
-    vecmem::hip::copy m_copy;
-#else
-    /// Device memory resource
-    vecmem::memory_resource& m_device_mr;
-    /// Memory copy object
-    vecmem::copy m_copy;
-#endif
+    traccc::alpaka::vecmem_resource::device_copy m_copy;
     /// Device caching memory resource
     std::unique_ptr<vecmem::binary_page_memory_resource> m_cached_device_mr;
 
