@@ -7,17 +7,8 @@
 
 #pragma once
 
+#include "traccc/alpaka/utils/get_vecmem_resource.hpp"
 #include <alpaka/alpaka.hpp>
-
-#ifdef ALPAKA_ACC_GPU_CUDA_ENABLED
-#include <vecmem/utils/cuda/copy.hpp>
-#endif
-
-#ifdef ALPAKA_ACC_GPU_HIP_ENABLED
-#include <vecmem/utils/hip/copy.hpp>
-#endif
-
-#include <vecmem/utils/copy.hpp>
 
 namespace traccc::alpaka {
 

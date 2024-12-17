@@ -23,4 +23,21 @@ void get_device_info() {
               << " [id: " << device << "] " << std::endl;
 }
 
+alpaka_accelerator get_device_type() {
+
+    if constexpr (::alpaka::accMatchesTags<Acc, ::alpaka::TagGpuCudaRt>) {
+        return alpaka_accelerator::gpu_cuda;
+    } else if constexpr (::alpaka::accMatchesTags<Acc, ::alpaka::TagGpuHipRt>) {
+        return alpaka_accelerator::gpu_hip;
+    } else if constexpr (::alpaka::accMatchesTags<Acc, ::alpaka::TagCpuSycl>) {
+        return alpaka_accelerator::cpu_sycl;
+    } else if constexpr (::alpaka::accMatchesTags<Acc, ::alpaka::TagFpgaSyclIntel>) {
+        return alpaka_accelerator::fpga_sycl_intel;
+    } else if constexpr (::alpaka::accMatchesTags<Acc, ::alpaka::TagGpuSyclIntel>) {
+        return alpaka_accelerator::gpu_sycl_intel;
+    } else {
+        return alpaka_accelerator::cpu;
+    }
+}
+
 }  // namespace traccc::alpaka
