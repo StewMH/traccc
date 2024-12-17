@@ -7,15 +7,15 @@
 
 #include <gtest/gtest.h>
 
-#include <alpaka/alpaka.hpp>
-#include <alpaka/example/ExampleDefaultAcc.hpp>
 #include <functional>
 #include <vecmem/memory/host_memory_resource.hpp>
 
 #include "tests/cca_test.hpp"
 #include "traccc/alpaka/clusterization/clusterization_algorithm.hpp"
-#include "traccc/alpaka/utils/vecmem_types.hpp"
+#include "traccc/alpaka/utils/get_vecmem_resource.hpp"
 #include "traccc/geometry/silicon_detector_description.hpp"
+
+#include <vecmem/memory/cuda/device_memory_resource.hpp>
 
 namespace {
 
@@ -26,18 +26,35 @@ cca_function_t get_f_with(traccc::clustering_config cfg) {
         std::map<traccc::geometry_id, vecmem::vector<traccc::measurement>>
             result;
 
-        using namespace alpaka;
-        using Dim = DimInt<1>;
-        using Idx = uint32_t;
+        traccc::alpaka::vecmem_resource::host_memory_resource host_mr;
+        traccc::alpaka::vecmem_resource::device_memory_resource device_mr;
+        traccc::alpaka::vecmem_resource::device_copy copy;
 
-        using Acc = ExampleDefaultAcc<Dim, Idx>;
-        traccc::alpaka::vecmem::host_device_types<
-            alpaka::trait::AccToTag<Acc>::type>::host_memory_resource host_mr;
-        traccc::alpaka::vecmem::host_device_types<
-            alpaka::trait::AccToTag<Acc>::type>::device_copy copy;
-        traccc::alpaka::vecmem::host_device_types<
-            alpaka::trait::AccToTag<Acc>::type>::device_memory_resource
-            device_mr;
+        if (traccc::alpaka::get_device_type() !=
+            traccc::alpaka::alpaka_accelerator::gpu_cuda) {
+            std::cerr << "This test is only for CUDA devices" << std::endl;
+            return result;
+        }
+
+        if (traccc::alpaka::acc_type != traccc::alpaka::alpaka_accelerator::gpu_cuda) {
+            std::cerr << "This test should be compiled only for CUDA devices" << std::endl;
+            return result;
+        }
+
+        // // Check if the device memory resource is of the correct type
+        // // It should be a vecmem::cuda::device_memory_resource
+        // if (typeid(device_mr) != typeid(typename traccc::alpaka::vecmem_resource::host_device_types<alpaka_accelerator::gpu_cuda)) {
+        //     std::cerr << "Device memory resource is not of the correct type"
+        //               << std::endl;
+
+        //     return result;
+        // }
+
+        static_assert(std::is_same_v<
+            decltype(device_mr),
+            typename traccc::alpaka::vecmem_resource::host_device_types<
+                traccc::alpaka::alpaka_accelerator::gpu_cuda>::device_memory_resource
+            >);
 
         traccc::alpaka::clusterization_algorithm cc({device_mr}, copy, cfg);
 
