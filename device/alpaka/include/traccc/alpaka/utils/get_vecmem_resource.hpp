@@ -62,26 +62,28 @@ struct host_device_types<alpaka_accelerator::gpu_hip> {
 #ifdef TRACCC_VECMEM_HAS_SYCL
 #include <vecmem/memory/sycl/device_memory_resource.hpp>
 #include <vecmem/memory/sycl/host_memory_resource.hpp>
+#include <vecmem/memory/sycl/shared_memory_resource.hpp>
 #include <vecmem/utils/sycl/copy.hpp>
 
 template <>
 struct host_device_types<alpaka_accelerator::cpu_sycl> {
     using device_memory_resource = ::vecmem::sycl::device_memory_resource;
     using host_memory_resource = ::vecmem::sycl::host_memory_resource;
-    using managed_memory_resource = ::vecmem::sycl::host_memory_resource;
+    using managed_memory_resource = ::vecmem::sycl::shared_memory_resource;
     using device_copy = ::vecmem::sycl::copy;
 };
 template <>
 struct host_device_types<alpaka_accelerator::fpga_sycl_intel> {
     using device_memory_resource = ::vecmem::sycl::device_memory_resource;
     using host_memory_resource = ::vecmem::sycl::host_memory_resource;
-    using managed_memory_resource = ::vecmem::sycl::host_memory_resource;
+    using managed_memory_resource = ::vecmem::sycl::shared_memory_resource;
     using device_copy = ::vecmem::sycl::copy;
 };
 template <>
 struct host_device_types<alpaka_accelerator::gpu_sycl_intel> {
     using device_memory_resource = ::vecmem::sycl::device_memory_resource;
     using host_memory_resource = ::vecmem::sycl::host_memory_resource;
+    using managed_memory_resource = ::vecmem::sycl::shared_memory_resource;
     using device_copy = ::vecmem::sycl::copy;
 };
 #endif

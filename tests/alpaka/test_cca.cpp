@@ -10,6 +10,11 @@
 #include <functional>
 #include <vecmem/memory/host_memory_resource.hpp>
 
+#ifdef ALPAKA_ACC_SYCL_ENABLED
+#include <sycl/sycl.hpp>
+#include <vecmem/utils/sycl/queue_wrapper.hpp>
+#endif
+
 #include "tests/cca_test.hpp"
 #include "traccc/alpaka/clusterization/clusterization_algorithm.hpp"
 #include "traccc/alpaka/utils/get_vecmem_resource.hpp"
@@ -29,32 +34,6 @@ cca_function_t get_f_with(traccc::clustering_config cfg) {
         traccc::alpaka::vecmem_resource::host_memory_resource host_mr;
         traccc::alpaka::vecmem_resource::device_memory_resource device_mr;
         traccc::alpaka::vecmem_resource::device_copy copy;
-
-        if (traccc::alpaka::get_device_type() !=
-            traccc::alpaka::alpaka_accelerator::gpu_cuda) {
-            std::cerr << "This test is only for CUDA devices" << std::endl;
-            return result;
-        }
-
-        if (traccc::alpaka::acc_type != traccc::alpaka::alpaka_accelerator::gpu_cuda) {
-            std::cerr << "This test should be compiled only for CUDA devices" << std::endl;
-            return result;
-        }
-
-        // // Check if the device memory resource is of the correct type
-        // // It should be a vecmem::cuda::device_memory_resource
-        // if (typeid(device_mr) != typeid(typename traccc::alpaka::vecmem_resource::host_device_types<alpaka_accelerator::gpu_cuda)) {
-        //     std::cerr << "Device memory resource is not of the correct type"
-        //               << std::endl;
-
-        //     return result;
-        // }
-
-        static_assert(std::is_same_v<
-            decltype(device_mr),
-            typename traccc::alpaka::vecmem_resource::host_device_types<
-                traccc::alpaka::alpaka_accelerator::gpu_cuda>::device_memory_resource
-            >);
 
         traccc::alpaka::clusterization_algorithm cc({device_mr}, copy, cfg);
 

@@ -9,19 +9,18 @@ include( traccc-alpaka-functions )
 include( traccc-compiler-options-cpp )
 
 set(PUBLIC_LIBRARIES traccc::core traccc::device_common vecmem::core covfie::core)
-set(PRIVATE_LIBRARIES alpaka::alpaka traccc::Thrust)
+set(PRIVATE_LIBRARIES alpaka::alpaka)
+
+traccc_enable_language_alpaka()
 
 if(alpaka_ACC_GPU_CUDA_ENABLE)
-  enable_language(CUDA)
-  include( traccc-compiler-options-cuda )
-
-  list(APPEND PRIVATE_LIBRARIES CUDA::cudart vecmem::cuda traccc::Thrust)
+  list(APPEND PRIVATE_LIBRARIES CUDA::cudart vecmem::cuda)
 elseif(alpaka_ACC_GPU_HIP_ENABLE)
-  enable_language(HIP)
   find_package( HIPToolkit REQUIRED )
-  list(APPEND PRIVATE_LIBRARIES HIP::hiprt vecmem::hip rocThrust)
-else()
-  list(APPEND PRIVATE_LIBRARIES traccc::Thrust)
+  list(APPEND PRIVATE_LIBRARIES HIP::hiprt vecmem::hip)
+elseif(alpaka_ACC_SYCL_ENABLE)
+  include( traccc-compiler-options-sycl )
+  list(APPEND PRIVATE_LIBRARIES vecmem::sycl)
 endif()
 
 traccc_add_alpaka_library( traccc_alpaka alpaka TYPE SHARED
@@ -69,5 +68,13 @@ traccc_add_alpaka_library( traccc_alpaka alpaka TYPE SHARED
   "include/traccc/alpaka/fitting/fitting_algorithm.hpp"
   "src/fitting/fitting_algorithm.cpp"
 )
+
+# Set up Thrust specifically for the traccc::alpaka library.
+if(alpaka_ACC_GPU_CUDA_ENABLE)
+thrust_create_target( traccc::cuda_thrust
+  HOST CPP
+  DEVICE CUDA )
+  list(APPEND PRIVATE_LIBRARIES traccc::cuda_thrust)
+endif()
 
 target_link_libraries(traccc_alpaka PUBLIC ${PUBLIC_LIBRARIES} PRIVATE ${PRIVATE_LIBRARIES})

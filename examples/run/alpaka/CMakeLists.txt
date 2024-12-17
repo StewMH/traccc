@@ -9,18 +9,19 @@ include( traccc-alpaka-functions )
 
 set(EXTRA_LIBS)
 
+include(traccc-alpaka-functions)
+traccc_enable_language_alpaka()
+
 if(alpaka_ACC_GPU_CUDA_ENABLE)
-  enable_language(CUDA)
-  include( traccc-compiler-options-cuda )
-  list (APPEND EXTRA_LIBS CUDA::cudart vecmem::cuda)
+  set_source_files_properties(${TRACCC_ALPAKA_EXAMPLE_SOURCES} PROPERTIES LANGUAGE CUDA)
+  list (APPEND EXTRA_LIBS vecmem::cuda)
 elseif(alpaka_ACC_GPU_HIP_ENABLE)
-  enable_language(HIP)
   find_package( HIPToolkit REQUIRED )
+  set_source_files_properties(${TRACCC_ALPAKA_EXAMPLE_SOURCES} PROPERTIES LANGUAGE HIP)
   list(APPEND EXTRA_LIBS HIP::hiprt vecmem::hip)
-  set (CMAKE_POSITION_INDEPENDENT_CODE ON)
-elseif (alpaka_ACC_SYCL_ENABLE)
+elseif(alpaka_ACC_SYCL_ENABLE)
   list(APPEND EXTRA_LIBS vecmem::sycl)
-  set (CMAKE_POSITION_INDEPENDENT_CODE ON)
+  set_source_files_properties(${TRACCC_ALPAKA_EXAMPLE_SOURCES} PROPERTIES LANGUAGE SYCL)
 endif()
 
 set(LIBRARIES vecmem::core traccc::io traccc::performance

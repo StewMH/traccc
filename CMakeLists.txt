@@ -176,12 +176,8 @@ if( TRACCC_SETUP_THRUST )
       add_subdirectory( extern/cccl )
    endif()
 endif()
-# Set up an IMPORTED library on top of the Thrust library/libraries. One that
-# the TRACCC/Detray code could depend on publicly.
-set( TRACCC_THRUST_OPTIONS "" CACHE STRING
-   "Extra options for configuring how Thrust should be used" )
-mark_as_advanced( TRACCC_THRUST_OPTIONS )
-thrust_create_target( traccc::Thrust ${TRACCC_THRUST_OPTIONS} )
+add_library( traccc::Thrust INTERFACE IMPORTED )
+target_link_libraries( traccc::Thrust INTERFACE Thrust::Thrust )
 
 # Set up rocThrust.
 option( TRACCC_SETUP_ROCTHRUST
@@ -241,7 +237,6 @@ if( TRACCC_SETUP_ALPAKA )
    # Default options for the Alpaka build.
    set( alpaka_ACC_CPU_B_SEQ_T_THREADS_ENABLE TRUE CACHE BOOL
       "Enable the serial backend of Alpaka" )
-
    if( TRACCC_USE_SYSTEM_ALPAKA )
       find_package( alpaka REQUIRED )
    else()
@@ -352,8 +347,13 @@ if( TRACCC_SETUP_BENCHMARKS )
 endif()
 
 # Set up indicators.
+set( _indicatorsDefault FALSE )
+if( TRACCC_BUILD_EXAMPLES OR TRACCC_BUILD_IO )
+   set( _indicatorsDefault TRUE )
+endif()
 option( TRACCC_SETUP_INDICATORS
-   "Set up the indicators target(s) explicitly" ${TRACCC_BUILD_EXAMPLES} )
+   "Set up the indicators target(s) explicitly" ${_indicatorsDefault} )
+unset( _indicatorsDefault )
 option( TRACCC_USE_SYSTEM_INDICATORS
    "Pick up an existing installation of indicators from the build environment"
    ${TRACCC_USE_SYSTEM_LIBS} )
