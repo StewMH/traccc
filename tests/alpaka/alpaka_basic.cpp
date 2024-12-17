@@ -15,12 +15,7 @@
 #include <vecmem/memory/host_memory_resource.hpp>
 #include <vecmem/utils/copy.hpp>
 
-#include "traccc/alpaka/utils/vecmem_types.hpp"
-
-#ifdef ALPAKA_ACC_SYCL_ENABLED
-#include <sycl/sycl.hpp>
-#include <vecmem/utils/sycl/queue_wrapper.hpp>
-#endif
+#include "traccc/alpaka/utils/get_vecmem_resource.hpp"
 
 // GoogleTest include(s).
 #include <gtest/gtest.h>
@@ -136,20 +131,9 @@ GTEST_TEST(AlpakaBasic, VecMemOp) {
     using WorkDiv = WorkDivMembers<Dim, Idx>;
     auto workDiv = WorkDiv{blocksPerGrid, threadsPerBlock, elementsPerThread};
 
-#ifdef ALPAKA_ACC_SYCL_ENABLED
-    ::sycl::queue q;
-    vecmem::sycl::queue_wrapper qw{&q};
-    traccc::alpaka::vecmem::host_device_types<
-        alpaka::trait::AccToTag<Acc>::type>::device_copy vm_copy(qw);
-#else
-    traccc::alpaka::vecmem::host_device_types<
-        alpaka::trait::AccToTag<Acc>::type>::device_copy vm_copy;
-#endif
-
-    traccc::alpaka::vecmem::host_device_types<
-        alpaka::trait::AccToTag<Acc>::type>::host_memory_resource host_mr;
-    traccc::alpaka::vecmem::host_device_types<
-        alpaka::trait::AccToTag<Acc>::type>::device_memory_resource device_mr;
+    traccc::alpaka::vecmem_resource::device_copy vm_copy;
+    traccc::alpaka::vecmem_resource::host_memory_resource host_mr;
+    traccc::alpaka::vecmem_resource::device_memory_resource device_mr;
 
     vecmem::vector<float> host_vector{n, &host_mr};
 

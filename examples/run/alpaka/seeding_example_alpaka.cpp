@@ -85,7 +85,6 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
     traccc::alpaka::vecmem_resource::device_memory_resource device_mr;
     traccc::alpaka::vecmem_resource::managed_memory_resource mng_mr;
     traccc::memory_resource mr{device_mr, &host_mr};
-#endif
 
     // Performance writer
     traccc::seeding_performance_writer sd_performance_writer(
