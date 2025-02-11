@@ -34,13 +34,13 @@ cca_function_t get_f_with(traccc::clustering_config cfg) {
 #ifdef ALPAKA_ACC_SYCL_ENABLED
         ::sycl::queue q;
         vecmem::sycl::queue_wrapper qw{&q};
-        traccc::alpaka::vecmem::host_memory_resource host_mr(qw);
-        traccc::alpaka::vecmem::device_copy copy(qw);
-        traccc::alpaka::vecmem::device_memory_resource device_mr;
+        traccc::alpaka::vecmem_resources::host_memory_resource host_mr(qw);
+        traccc::alpaka::vecmem_resources::device_copy copy(qw);
+        traccc::alpaka::vecmem_resources::device_memory_resource device_mr;
 #else
-        traccc::alpaka::vecmem::host_memory_resource host_mr;
-        traccc::alpaka::vecmem::device_copy copy;
-        traccc::alpaka::vecmem::device_memory_resource device_mr;
+        traccc::alpaka::vecmem_resources::host_memory_resource host_mr;
+        traccc::alpaka::vecmem_resources::device_copy copy;
+        traccc::alpaka::vecmem_resources::device_memory_resource device_mr;
 #endif
 
         traccc::alpaka::clusterization_algorithm cc({device_mr}, copy, cfg);

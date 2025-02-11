@@ -46,7 +46,7 @@ namespace traccc::alpaka {
 /// At least as much as is implemented in the project at any given moment.
 ///
 class full_chain_algorithm
-    : public algorithm<vecmem::vector<fitting_result<default_algebra>>(
+    : public algorithm<::vecmem::vector<fitting_result<default_algebra>>(
           const edm::silicon_cell_collection::host&)> {
 
     public:
@@ -58,11 +58,13 @@ class full_chain_algorithm
     /// (Device) Detector type used during track finding and fitting
     using device_detector_type = traccc::default_detector::device;
 
+    using scalar_type = device_detector_type::scalar_type;
+
     /// Stepper type used by the track finding and fitting algorithms
     using stepper_type =
-        detray::rk_stepper<detray::bfield::const_field_t::view_t,
+        detray::rk_stepper<detray::bfield::const_field_t<scalar_type>::view_t,
                            device_detector_type::algebra_type,
-                           detray::constrained_step<>>;
+                           detray::constrained_step<scalar_type>>;
     /// Navigator type used by the track finding and fitting algorithms
     using navigator_type = detray::navigator<const device_detector_type>;
     /// Spacepoint formation algorithm type
@@ -85,7 +87,7 @@ class full_chain_algorithm
     /// @param mr The memory resource to use for the intermediate and result
     ///           objects
     ///
-    full_chain_algorithm(vecmem::memory_resource& host_mr,
+    full_chain_algorithm(::vecmem::memory_resource& host_mr,
                          const clustering_config& clustering_config,
                          const seedfinder_config& finder_config,
                          const spacepoint_grid_config& grid_config,
@@ -118,18 +120,18 @@ class full_chain_algorithm
 
     private:
     /// Host memory resource
-    vecmem::memory_resource& m_host_mr;
+    ::vecmem::memory_resource& m_host_mr;
     /// Device memory resource
-    traccc::alpaka::vecmem_resource::device_memory_resource& m_device_mr;
+    traccc::alpaka::vecmem_resources::device_memory_resource m_device_mr;
     /// Memory copy object
-    traccc::alpaka::vecmem_resource::device_copy m_copy;
+    traccc::alpaka::vecmem_resources::device_copy m_copy;
     /// Device caching memory resource
-    std::unique_ptr<vecmem::binary_page_memory_resource> m_cached_device_mr;
+    std::unique_ptr<::vecmem::binary_page_memory_resource> m_cached_device_mr;
 
     /// Constant B field for the (seed) track parameter estimation
     traccc::vector3 m_field_vec;
     /// Constant B field for the track finding and fitting
-    detray::bfield::const_field_t m_field;
+    detray::bfield::const_field_t<traccc::scalar> m_field;
 
     /// Detector description
     std::reference_wrapper<const silicon_detector_description::host>

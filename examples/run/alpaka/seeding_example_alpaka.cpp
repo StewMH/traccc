@@ -80,16 +80,16 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
 #ifdef ALPAKA_ACC_SYCL_ENABLED
     ::sycl::queue q;
     vecmem::sycl::queue_wrapper qw{&q};
-    traccc::alpaka::vecmem::device_copy copy(qw);
-    traccc::alpaka::vecmem::host_memory_resource host_mr(qw);
-    traccc::alpaka::vecmem::device_memory_resource device_mr(qw);
-    traccc::alpaka::vecmem::managed_memory_resource mng_mr(qw);
+    traccc::alpaka::vecmem_resources::device_copy copy(qw);
+    traccc::alpaka::vecmem_resources::host_memory_resource host_mr(qw);
+    traccc::alpaka::vecmem_resources::device_memory_resource device_mr(qw);
+    traccc::alpaka::vecmem_resources::managed_memory_resource mng_mr(qw);
     traccc::memory_resource mr{device_mr, &host_mr};
 #else
-    traccc::alpaka::vecmem::device_copy copy;
-    traccc::alpaka::vecmem::host_memory_resource host_mr;
-    traccc::alpaka::vecmem::device_memory_resource device_mr;
-    traccc::alpaka::vecmem::managed_memory_resource mng_mr;
+    traccc::alpaka::vecmem_resources::device_copy copy;
+    traccc::alpaka::vecmem_resources::host_memory_resource host_mr;
+    traccc::alpaka::vecmem_resources::device_memory_resource device_mr;
+    traccc::alpaka::vecmem_resources::managed_memory_resource mng_mr;
     traccc::memory_resource mr{device_mr, &host_mr};
 #endif
 

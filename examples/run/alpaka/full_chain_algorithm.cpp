@@ -15,7 +15,7 @@
 namespace traccc::alpaka {
 
 full_chain_algorithm::full_chain_algorithm(
-    vecmem::memory_resource& host_mr,
+    ::vecmem::memory_resource& host_mr,
     const clustering_config& clustering_config,
     const seedfinder_config& finder_config,
     const spacepoint_grid_config& grid_config,
@@ -32,9 +32,11 @@ full_chain_algorithm::full_chain_algorithm(
 #endif
       m_copy(),
       m_cached_device_mr(
-          std::make_unique<vecmem::binary_page_memory_resource>(m_device_mr)),
+          std::make_unique<::vecmem::binary_page_memory_resource>(m_device_mr)),
       m_field_vec{0.f, 0.f, finder_config.bFieldInZ},
-      m_field(detray::bfield::create_const_field(m_field_vec)),
+      m_field(
+          detray::bfield::create_const_field<host_detector_type::scalar_type>(
+              m_field_vec)),
       m_det_descr(det_descr),
       m_device_det_descr(
           static_cast<silicon_detector_description::buffer::size_type>(
@@ -64,7 +66,7 @@ full_chain_algorithm::full_chain_algorithm(
     traccc::alpaka::get_device_info();
 
     // Copy the detector (description) to the device.
-    m_copy(vecmem::get_data(m_det_descr.get()), m_device_det_descr)->ignore();
+    m_copy(::vecmem::get_data(m_det_descr.get()), m_device_det_descr)->ignore();
     if (m_detector != nullptr) {
         m_device_detector = detray::get_buffer(detray::get_data(*m_detector),
                                                m_device_mr, m_copy);
@@ -81,7 +83,7 @@ full_chain_algorithm::full_chain_algorithm(const full_chain_algorithm& parent)
 #endif
       m_copy(),
       m_cached_device_mr(
-          std::make_unique<vecmem::binary_page_memory_resource>(m_device_mr)),
+          std::make_unique<::vecmem::binary_page_memory_resource>(m_device_mr)),
       m_field_vec(parent.m_field_vec),
       m_field(parent.m_field),
       m_det_descr(parent.m_det_descr),
@@ -112,7 +114,7 @@ full_chain_algorithm::full_chain_algorithm(const full_chain_algorithm& parent)
       m_fitting_config(parent.m_fitting_config) {
 
     // Copy the detector (description) to the device.
-    m_copy(vecmem::get_data(m_det_descr.get()), m_device_det_descr)->ignore();
+    m_copy(::vecmem::get_data(m_det_descr.get()), m_device_det_descr)->ignore();
     if (m_detector != nullptr) {
         m_device_detector = detray::get_buffer(detray::get_data(*m_detector),
                                                m_device_mr, m_copy);
@@ -128,7 +130,7 @@ full_chain_algorithm::output_type full_chain_algorithm::operator()(
     // Create device copy of input collections
     edm::silicon_cell_collection::buffer cells_buffer(
         static_cast<unsigned int>(cells.size()), *m_cached_device_mr);
-    m_copy(vecmem::get_data(cells), cells_buffer)->ignore();
+    m_copy(::vecmem::get_data(cells), cells_buffer)->ignore();
 
     // Run the clusterization.
     const clusterization_algorithm::output_type measurements =
