@@ -8,7 +8,7 @@
 #pragma once
 
 #include "../../utils/barrier.hpp"
-#include "traccc/alpaka/utils/thread_id.hpp"
+#include "../../utils/thread_id.hpp"
 #include "traccc/edm/track_parameters.hpp"
 #include "traccc/finding/device/find_tracks.hpp"
 #include "traccc/geometry/detector.hpp"
@@ -28,15 +28,14 @@ struct FindTracksKernel {
         unsigned int* shared_num_candidates = s;
 
         alpaka::barrier<TAcc> barrier(&acc);
-        alpaka::thread_id1 thread_id(&acc);
+        details::thread_id1 thread_id(&acc);
 
         int blockDimX = thread_id.getBlockDimX();
         std::pair<unsigned int, unsigned int>* shared_candidates =
             reinterpret_cast<std::pair<unsigned int, unsigned int>*>(
                 &shared_num_candidates[blockDimX]);
 
-        device::find_tracks<alpaka::thread_id1<TAcc>, alpaka::barrier<TAcc>,
-                            detector_t, finding_config>(
+        device::find_tracks<detector_t>(
             thread_id, barrier, cfg, payload,
             {shared_num_candidates, shared_candidates, shared_candidates_size});
     }

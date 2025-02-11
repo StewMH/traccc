@@ -9,6 +9,7 @@
 #include "traccc/alpaka/finding/finding_algorithm.hpp"
 
 #include "../utils/barrier.hpp"
+#include "../utils/thread_id.hpp"
 #include "../utils/utils.hpp"
 #include "./kernels/apply_interaction.hpp"
 #include "./kernels/build_tracks.hpp"
@@ -17,19 +18,19 @@
 #include "./kernels/make_barcode_sequence.hpp"
 #include "./kernels/propagate_to_next_surface.hpp"
 #include "./kernels/prune_tracks.hpp"
-#include "traccc/alpaka/utils/thread_id.hpp"
 #include "traccc/definitions/primitives.hpp"
 #include "traccc/definitions/qualifiers.hpp"
 #include "traccc/edm/device/sort_key.hpp"
 #include "traccc/finding/candidate_link.hpp"
+#include "traccc/geometry/detector.hpp"
 #include "traccc/utils/projections.hpp"
 
 // detray include(s).
-#include "detray/core/detector.hpp"
-#include "detray/core/detector_metadata.hpp"
 #include "detray/detectors/bfield.hpp"
 #include "detray/navigation/navigator.hpp"
 #include "detray/propagator/rk_stepper.hpp"
+#include "vecmem/containers/data/vector_view.hpp"
+#include "vecmem/memory/unique_ptr.hpp"
 
 // VecMem include(s).
 #include <vecmem/containers/data/vector_buffer.hpp>
@@ -190,8 +191,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
                 queue, workDiv,
                 ApplyInteractionKernel<std::decay_t<detector_type>>{}, m_cfg,
                 device::apply_interaction_payload<std::decay_t<detector_type>>{
-                    det_view, static_cast<int>(n_in_params),
-                    vecmem::get_data(in_params_buffer),
+                    det_view, n_in_params, vecmem::get_data(in_params_buffer),
                     vecmem::get_data(param_liveness_buffer)});
             ::alpaka::wait(queue);
         }
@@ -441,11 +441,12 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
 }
 
 // Explicit template instantiation
-using default_detector_type =
-    detray::detector<detray::default_metadata, detray::device_container_types>;
-using default_stepper_type =
-    detray::rk_stepper<covfie::field<detray::bfield::const_bknd_t>::view_t,
-                       traccc::default_algebra, detray::constrained_step<>>;
+using default_detector_type = traccc::default_detector::device;
+using default_stepper_type = detray::rk_stepper<
+    covfie::field<detray::bfield::const_bknd_t<
+        default_detector_type::scalar_type>>::view_t,
+    default_detector_type::algebra_type,
+    detray::constrained_step<default_detector_type::scalar_type>>;
 using default_navigator_type = detray::navigator<const default_detector_type>;
 template class finding_algorithm<default_stepper_type, default_navigator_type>;
 
