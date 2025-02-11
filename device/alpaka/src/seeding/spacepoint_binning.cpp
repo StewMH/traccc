@@ -83,7 +83,7 @@ spacepoint_binning::output_type spacepoint_binning::operator()(
         grid_capacities_buff;
 
     // Now define the Alpaka Work division
-    const Idx threadsPerBlock = warpSize * 8;
+    const Idx threadsPerBlock = getWarpSize<Acc>()* 8;
     const Idx blocksPerGrid =
         (sp_size + threadsPerBlock - 1) / threadsPerBlock;
     auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);

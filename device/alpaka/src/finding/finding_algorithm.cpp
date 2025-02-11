@@ -70,7 +70,7 @@ finding_algorithm<stepper_t, navigator_t>::operator()(
     auto devHost = ::alpaka::getDevByIdx(::alpaka::Platform<Host>{}, 0u);
     auto devAcc = ::alpaka::getDevByIdx(::alpaka::Platform<Acc>{}, 0u);
     auto queue = Queue{devAcc};
-    Idx threadsPerBlock = warpSize * 2;
+    Idx threadsPerBlock = getWarpSize<Acc>()* 2;
 
     // Copy setup
     m_copy.setup(seeds_buffer)->ignore();

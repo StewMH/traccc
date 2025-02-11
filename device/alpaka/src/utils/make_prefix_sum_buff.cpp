@@ -47,7 +47,7 @@ vecmem::data::vector_buffer<device::prefix_sum_element_t> make_prefix_sum_buff(
     auto data_prefix_sum_buff = vecmem::get_data(prefix_sum_buff);
 
     // Fixed number of threads per block.
-    const Idx threadsPerBlock = warpSize;
+    const Idx threadsPerBlock = getWarpSize<Acc>();
     const Idx blocksPerGrid =
         (totalSize + threadsPerBlock - 1) / threadsPerBlock;
     auto workDiv = makeWorkDiv<Acc>(blocksPerGrid, threadsPerBlock);
