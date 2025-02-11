@@ -49,6 +49,7 @@ class fitting_algorithm
         const typename fitter_t::bfield_type& field_view,
         const typename track_candidate_container_types::const_view&
             track_candidates_view) const override;
+
     private:
     /// Config object
     config_type m_cfg;

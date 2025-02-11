@@ -23,7 +23,8 @@ namespace traccc::alpaka::details {
 /// An Alpaka thread identifier type
 template <typename TAcc>
 struct thread_id1 {
-    ALPAKA_FN_INLINE ALPAKA_FN_ACC explicit thread_id1(const TAcc* acc) : m_acc(acc) {}
+    ALPAKA_FN_INLINE ALPAKA_FN_ACC explicit thread_id1(const TAcc* acc)
+        : m_acc(acc) {}
 
     unsigned int inline ALPAKA_FN_ACC getLocalThreadId() const {
         return static_cast<unsigned int>(

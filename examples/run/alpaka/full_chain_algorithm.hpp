@@ -183,7 +183,6 @@ class full_chain_algorithm
     /// Configuration for the track fitting
     fitting_algorithm::config_type m_fitting_config;
 
-
     /// @}
 
 };  // class full_chain_algorithm

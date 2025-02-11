@@ -248,7 +248,8 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
                     static_cast<unsigned int>(measurements_per_event.size()),
                     mr.main);
             copy(vecmem::get_data(measurements_per_event),
-                 measurements_alpaka_buffer)->wait();
+                 measurements_alpaka_buffer)
+                ->wait();
 
             {
                 traccc::performance::timer t("Seeding (alpaka)", elapsedTimes);

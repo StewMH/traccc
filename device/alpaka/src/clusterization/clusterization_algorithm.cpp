@@ -9,8 +9,8 @@
 #include "traccc/alpaka/clusterization/clusterization_algorithm.hpp"
 
 #include "../utils/barrier.hpp"
-#include "../utils/utils.hpp"
 #include "../utils/thread_id.hpp"
+#include "../utils/utils.hpp"
 
 // Project include(s)
 #include "traccc/clusterization/clustering_config.hpp"

@@ -15,12 +15,12 @@
 #include <vecmem/utils/sycl/queue_wrapper.hpp>
 #endif
 
+#include <vecmem/memory/cuda/device_memory_resource.hpp>
+
 #include "tests/cca_test.hpp"
 #include "traccc/alpaka/clusterization/clusterization_algorithm.hpp"
 #include "traccc/alpaka/utils/get_vecmem_resource.hpp"
 #include "traccc/geometry/silicon_detector_description.hpp"
-
-#include <vecmem/memory/cuda/device_memory_resource.hpp>
 
 namespace {
 

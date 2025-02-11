@@ -10,17 +10,15 @@
 
 // Local include(s).
 #include "../common/throughput_st.hpp"
-
 #include "full_chain_algorithm.hpp"
-
 
 int main(int argc, char* argv[]) {
 
     // Execute the throughput test.
     static const bool use_host_caching = true;
-    return traccc::throughput_st<traccc::alpaka::full_chain_algorithm,
-                                 traccc::alpaka::vecmem_resources::host_memory_resource
-                                 >(
+    return traccc::throughput_st<
+        traccc::alpaka::full_chain_algorithm,
+        traccc::alpaka::vecmem_resources::host_memory_resource>(
         "Single-threaded Alpaka GPU throughput tests", argc, argv,
         use_host_caching);
 }

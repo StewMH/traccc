@@ -5,7 +5,6 @@
  * Mozilla Public License Version 2.0
  */
 
-
 // Project include(s).
 #include "traccc/alpaka/clusterization/clusterization_algorithm.hpp"
 #include "traccc/alpaka/clusterization/measurement_sorting_algorithm.hpp"

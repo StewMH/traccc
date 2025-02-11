@@ -195,8 +195,9 @@ seed_finding::output_type seed_finding::operator()(
     auto queue = Queue{devAcc};
     auto const deviceProperties = ::alpaka::getAccDevProps<Acc>(devAcc);
     auto maxThreads = deviceProperties.m_blockThreadExtentMax[0];
-    Idx threadsPerBlock =
-        getWarpSize<Acc>()* 2 < maxThreads ? getWarpSize<Acc>()* 2 : maxThreads;
+    Idx threadsPerBlock = getWarpSize<Acc>() * 2 < maxThreads
+                              ? getWarpSize<Acc>() * 2
+                              : maxThreads;
 
     // Get the sizes from the grid view
     auto grid_sizes = m_copy.get_sizes(g2_view._data_view);
