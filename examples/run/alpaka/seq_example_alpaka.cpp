@@ -18,6 +18,9 @@
 #include "traccc/clusterization/clusterization_algorithm.hpp"
 #include "traccc/device/container_d2h_copy_alg.hpp"
 #include "traccc/efficiency/seeding_performance_writer.hpp"
+#include "traccc/finding/combinatorial_kalman_filter_algorithm.hpp"
+#include "traccc/fitting/kalman_filter/kalman_fitter.hpp"
+#include "traccc/fitting/kalman_fitting_algorithm.hpp"
 #include "traccc/geometry/detector.hpp"
 #include "traccc/io/read_cells.hpp"
 #include "traccc/io/read_detector.hpp"
@@ -30,6 +33,7 @@
 #include "traccc/options/performance.hpp"
 #include "traccc/options/program_options.hpp"
 #include "traccc/options/track_finding.hpp"
+#include "traccc/options/track_fitting.hpp"
 #include "traccc/options/track_propagation.hpp"
 #include "traccc/options/track_seeding.hpp"
 #include "traccc/performance/collection_comparator.hpp"
@@ -64,18 +68,6 @@ int seq_run(const traccc::opts::detector& detector_opts,
             const traccc::opts::performance& performance_opts,
             const traccc::opts::accelerator& accelerator_opts) {
 
-    // Output stats
-    uint64_t n_cells = 0;
-    uint64_t n_measurements = 0;
-    uint64_t n_spacepoints = 0;
-    uint64_t n_spacepoints_alpaka = 0;
-    uint64_t n_seeds = 0;
-    uint64_t n_seeds_alpaka = 0;
-
-    // Constant B field for the track finding and fitting
-    const traccc::vector3 field_vec = {0.f, 0.f,
-                                       seeding_opts.seedfinder.bFieldInZ};
-
     // Memory resources used by the application.
 #ifdef ALPAKA_ACC_SYCL_ENABLED
     ::sycl::queue q;
@@ -102,7 +94,8 @@ int seq_run(const traccc::opts::detector& detector_opts,
     traccc::silicon_detector_description::buffer device_det_descr{
         static_cast<traccc::silicon_detector_description::buffer::size_type>(
             host_det_descr.size()),
-        mr.main};
+        device_mr};
+    copy.setup(device_det_descr)->wait();
     copy(host_det_descr_data, device_det_descr)->wait();
 
     // Construct a Detray detector object, if supported by the configuration.
@@ -113,7 +106,7 @@ int seq_run(const traccc::opts::detector& detector_opts,
         traccc::io::read_detector(
             host_detector, host_mr, detector_opts.detector_file,
             detector_opts.material_file, detector_opts.grid_file);
-        device_detector = detray::get_buffer(host_detector, mr.main, copy);
+        device_detector = detray::get_buffer(host_detector, device_mr, copy);
         device_detector_view = detray::get_data(device_detector);
     }
 
@@ -131,15 +124,16 @@ int seq_run(const traccc::opts::detector& detector_opts,
     uint64_t n_fitted_tracks_alpaka = 0;
 
     // Type definitions
+    using scalar_type = traccc::default_detector::host::scalar_type;
     using host_spacepoint_formation_algorithm =
         traccc::host::silicon_pixel_spacepoint_formation_algorithm;
     using device_spacepoint_formation_algorithm =
         traccc::alpaka::spacepoint_formation_algorithm<
             traccc::default_detector::device>;
     using stepper_type =
-        detray::rk_stepper<detray::bfield::const_field_t::view_t,
+        detray::rk_stepper<detray::bfield::const_field_t<scalar_type>::view_t,
                            traccc::default_detector::host::algebra_type,
-                           detray::constrained_step<>>;
+                           detray::constrained_step<scalar_type>>;
     using device_navigator_type =
         detray::navigator<const traccc::default_detector::device>;
 
@@ -164,8 +158,8 @@ int seq_run(const traccc::opts::detector& detector_opts,
     // Constant B field for the track finding and fitting
     const traccc::vector3 field_vec = {0.f, 0.f,
                                        seeding_opts.seedfinder.bFieldInZ};
-    const detray::bfield::const_field_t field =
-        detray::bfield::create_const_field(field_vec);
+    const detray::bfield::const_field_t<traccc::scalar> field =
+        detray::bfield::create_const_field<traccc::scalar>(field_vec);
 
     traccc::host::clusterization_algorithm ca(host_mr);
     host_spacepoint_formation_algorithm sf(host_mr);
@@ -244,6 +238,7 @@ int seq_run(const traccc::opts::detector& detector_opts,
             // Create device copy of input collections
             traccc::edm::silicon_cell_collection::buffer cells_buffer(
                 static_cast<unsigned int>(cells_per_event.size()), mr.main);
+            copy.setup(cells_buffer)->wait();
             copy(vecmem::get_data(cells_per_event), cells_buffer)->wait();
 
             // Alpaka
@@ -454,7 +449,7 @@ int seq_run(const traccc::opts::detector& detector_opts,
 
         if (performance_opts.run) {
 
-            // TODO: Do evt_data.fill_cca_result(...) with cuda clusters and
+            // TODO: Do evt_data.fill_cca_result(...) with alpaka clusters and
             // measurements
         }
     }
