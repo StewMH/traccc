@@ -1,6 +1,6 @@
 /** TRACCC library, part of the ACTS project (R&D line)
  *
- * (c) 2022-2024 CERN for the benefit of the ACTS project
+ * (c) 2022-2025 CERN for the benefit of the ACTS project
  *
  * Mozilla Public License Version 2.0
  */
@@ -9,6 +9,7 @@
 
 // Local include(s).
 #include "../utils/calculate1DimNdRange.hpp"
+#include "../utils/global_index.hpp"
 
 // Project include(s).
 #include "traccc/edm/device/sort_key.hpp"
@@ -23,8 +24,17 @@
 #include <vecmem/utils/copy.hpp>
 
 // oneDPL include(s).
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Wimplicit-int-conversion"
+#pragma clang diagnostic ignored "-Wimplicit-int-float-conversion"
+#pragma clang diagnostic ignored "-Wsign-compare"
 #include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/execution>
+#pragma clang diagnostic pop
 
 // SYCL include(s).
 #include <sycl/sycl.hpp>
@@ -96,7 +106,7 @@ track_state_container_types::buffer fit_tracks(
             [track_candidates_view, keys_view = vecmem::get_data(keys_buffer),
              param_ids_view =
                  vecmem::get_data(param_ids_buffer)](::sycl::nd_item<1> item) {
-                device::fill_sort_keys(item.get_global_linear_id(),
+                device::fill_sort_keys(details::global_index(item),
                                        track_candidates_view, keys_view,
                                        param_ids_view);
             });
@@ -120,7 +130,7 @@ track_state_container_types::buffer fit_tracks(
                 range, [det_view, field_view, config, track_candidates_view,
                         param_ids_view = vecmem::get_data(param_ids_buffer),
                         track_states_view](::sycl::nd_item<1> item) {
-                    device::fit<fitter_t>(item.get_global_linear_id(), det_view,
+                    device::fit<fitter_t>(details::global_index(item), det_view,
                                           field_view, config,
                                           track_candidates_view, param_ids_view,
                                           track_states_view);

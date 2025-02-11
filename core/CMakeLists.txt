@@ -74,6 +74,7 @@ traccc_add_library( traccc_core core TYPE SHARED
   "include/traccc/fitting/kalman_filter/kalman_fitter.hpp"
   "include/traccc/fitting/kalman_filter/kalman_step_aborter.hpp"
   "include/traccc/fitting/kalman_filter/statistics_updater.hpp"
+  "include/traccc/fitting/kalman_filter/two_filters_smoother.hpp"
   "include/traccc/fitting/details/fit_tracks.hpp"
   "include/traccc/fitting/kalman_fitting_algorithm.hpp"
   "src/fitting/kalman_fitting_algorithm.cpp"
@@ -114,7 +115,7 @@ traccc_add_library( traccc_core core TYPE SHARED
   "include/traccc/ambiguity_resolution/greedy_ambiguity_resolution_algorithm.hpp"
   "src/ambiguity_resolution/greedy_ambiguity_resolution_algorithm.cpp" )
 target_link_libraries( traccc_core
-  PUBLIC Eigen3::Eigen vecmem::core detray::core detray::detectors traccc::Thrust
+  PUBLIC Eigen3::Eigen vecmem::core detray::core detray::detectors
          traccc::algebra )
 
 # Prevent Eigen from getting confused when building code for a

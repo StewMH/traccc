@@ -23,6 +23,7 @@
 #include "traccc/options/input_data.hpp"
 #include "traccc/options/performance.hpp"
 #include "traccc/options/program_options.hpp"
+#include "traccc/options/track_fitting.hpp"
 #include "traccc/options/track_propagation.hpp"
 #include "traccc/performance/collection_comparator.hpp"
 #include "traccc/performance/container_comparator.hpp"
@@ -31,8 +32,6 @@
 #include "traccc/utils/seed_generator.hpp"
 
 // detray include(s).
-#include "detray/core/detector.hpp"
-#include "detray/core/detector_metadata.hpp"
 #include "detray/detectors/bfield.hpp"
 #include "detray/io/frontend/detector_reader.hpp"
 #include "detray/navigation/navigator.hpp"
@@ -62,6 +61,7 @@ int main(int argc, char* argv[]) {
     traccc::opts::detector detector_opts;
     traccc::opts::input_data input_opts;
     traccc::opts::track_propagation propagation_opts;
+    traccc::opts::track_fitting fitting_opts;
     traccc::opts::performance performance_opts;
     traccc::opts::accelerator accelerator_opts;
     traccc::opts::program_options program_opts{
@@ -75,10 +75,11 @@ int main(int argc, char* argv[]) {
     using host_detector_type = traccc::default_detector::host;
     using device_detector_type = traccc::default_detector::device;
 
-    using b_field_t = covfie::field<detray::bfield::const_bknd_t>;
+    using scalar_type = device_detector_type::scalar_type;
+    using b_field_t = covfie::field<detray::bfield::const_bknd_t<scalar_type>>;
     using rk_stepper_type =
         detray::rk_stepper<b_field_t::view_t, traccc::default_algebra,
-                           detray::constrained_step<>>;
+                           detray::constrained_step<scalar_type>>;
     using device_navigator_type = detray::navigator<const device_detector_type>;
     using device_fitter_type =
         traccc::kalman_fitter<rk_stepper_type, device_navigator_type>;
@@ -105,7 +106,7 @@ int main(int argc, char* argv[]) {
     // B field value and its type
     // @TODO: Set B field as argument
     const traccc::vector3 B{0, 0, 2 * detray::unit<traccc::scalar>::T};
-    auto field = detray::bfield::create_const_field(B);
+    auto field = detray::bfield::create_const_field<traccc::scalar>(B);
 
     // Read the detector
     detray::io::detector_reader_config reader_cfg{};
@@ -152,7 +153,7 @@ int main(int argc, char* argv[]) {
         1.f * detray::unit<scalar>::ns};
 
     // Fitting algorithm object
-    traccc::fitting_config fit_cfg;
+    traccc::fitting_config fit_cfg(fitting_opts);
     fit_cfg.propagation = propagation_opts;
 
     traccc::host::kalman_fitting_algorithm host_fitting(fit_cfg, host_mr);

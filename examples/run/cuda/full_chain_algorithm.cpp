@@ -44,7 +44,9 @@ full_chain_algorithm::full_chain_algorithm(
           std::make_unique<vecmem::binary_page_memory_resource>(m_device_mr)),
       m_copy(m_stream.cudaStream()),
       m_field_vec{0.f, 0.f, finder_config.bFieldInZ},
-      m_field(detray::bfield::create_const_field(m_field_vec)),
+      m_field(
+          detray::bfield::create_const_field<host_detector_type::scalar_type>(
+              m_field_vec)),
       m_det_descr(det_descr),
       m_device_det_descr(
           static_cast<silicon_detector_description::buffer::size_type>(
@@ -53,7 +55,8 @@ full_chain_algorithm::full_chain_algorithm(
       m_detector(detector),
       m_clusterization(memory_resource{*m_cached_device_mr, &m_host_mr}, m_copy,
                        m_stream, clustering_config),
-      m_measurement_sorting(m_copy, m_stream),
+      m_measurement_sorting(memory_resource{*m_cached_device_mr, &m_host_mr},
+                            m_copy, m_stream),
       m_spacepoint_formation(memory_resource{*m_cached_device_mr, &m_host_mr},
                              m_copy, m_stream),
       m_seeding(finder_config, grid_config, filter_config,
@@ -86,8 +89,8 @@ full_chain_algorithm::full_chain_algorithm(
     // Copy the detector (description) to the device.
     m_copy(vecmem::get_data(m_det_descr.get()), m_device_det_descr)->ignore();
     if (m_detector != nullptr) {
-        m_device_detector = detray::get_buffer(detray::get_data(*m_detector),
-                                               m_device_mr, m_copy);
+        m_device_detector =
+            detray::get_buffer(*m_detector, m_device_mr, m_copy);
         m_device_detector_view = detray::get_data(m_device_detector);
     }
 }
@@ -109,7 +112,8 @@ full_chain_algorithm::full_chain_algorithm(const full_chain_algorithm& parent)
       m_detector(parent.m_detector),
       m_clusterization(memory_resource{*m_cached_device_mr, &m_host_mr}, m_copy,
                        m_stream, parent.m_clustering_config),
-      m_measurement_sorting(m_copy, m_stream),
+      m_measurement_sorting(memory_resource{*m_cached_device_mr, &m_host_mr},
+                            m_copy, m_stream),
       m_spacepoint_formation(memory_resource{*m_cached_device_mr, &m_host_mr},
                              m_copy, m_stream),
       m_seeding(
@@ -133,8 +137,8 @@ full_chain_algorithm::full_chain_algorithm(const full_chain_algorithm& parent)
     // Copy the detector (description) to the device.
     m_copy(vecmem::get_data(m_det_descr.get()), m_device_det_descr)->ignore();
     if (m_detector != nullptr) {
-        m_device_detector = detray::get_buffer(detray::get_data(*m_detector),
-                                               m_device_mr, m_copy);
+        m_device_detector =
+            detray::get_buffer(*m_detector, m_device_mr, m_copy);
         m_device_detector_view = detray::get_data(m_device_detector);
     }
 }

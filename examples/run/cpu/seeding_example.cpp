@@ -1,6 +1,6 @@
 /** TRACCC library, part of the ACTS project (R&D line)
  *
- * (c) 2022-2024 CERN for the benefit of the ACTS project
+ * (c) 2022-2025 CERN for the benefit of the ACTS project
  *
  * Mozilla Public License Version 2.0
  */
@@ -8,6 +8,7 @@
 // Project include(s).
 #include "traccc/definitions/common.hpp"
 #include "traccc/definitions/primitives.hpp"
+#include "traccc/geometry/detector.hpp"
 
 // io
 #include "traccc/io/read_detector.hpp"
@@ -34,13 +35,13 @@
 #include "traccc/options/performance.hpp"
 #include "traccc/options/program_options.hpp"
 #include "traccc/options/track_finding.hpp"
+#include "traccc/options/track_fitting.hpp"
 #include "traccc/options/track_propagation.hpp"
 #include "traccc/options/track_resolution.hpp"
 #include "traccc/options/track_seeding.hpp"
 
 // Detray include(s).
 #include "detray/core/detector.hpp"
-#include "detray/core/detector_metadata.hpp"
 #include "detray/detectors/bfield.hpp"
 #include "detray/io/frontend/detector_reader.hpp"
 #include "detray/navigation/navigator.hpp"
@@ -60,6 +61,7 @@ using namespace traccc;
 int seq_run(const traccc::opts::track_seeding& seeding_opts,
             const traccc::opts::track_finding& finding_opts,
             const traccc::opts::track_propagation& propagation_opts,
+            const traccc::opts::track_fitting& fitting_opts,
             const traccc::opts::track_resolution& resolution_opts,
             const traccc::opts::input_data& input_opts,
             const traccc::opts::detector& detector_opts,
@@ -96,7 +98,7 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
     // B field value and its type
     // @TODO: Set B field as argument
     const traccc::vector3 B{0, 0, 2 * detray::unit<traccc::scalar>::T};
-    auto field = detray::bfield::create_const_field(B);
+    auto field = detray::bfield::create_const_field<traccc::scalar>(B);
 
     // Construct a Detray detector object, if supported by the configuration.
     traccc::default_detector::host detector{host_mr};
@@ -121,7 +123,7 @@ int seq_run(const traccc::opts::track_seeding& seeding_opts,
     traccc::host::combinatorial_kalman_filter_algorithm host_finding(cfg);
 
     // Fitting algorithm object
-    traccc::fitting_config fit_cfg;
+    traccc::fitting_config fit_cfg(fitting_opts);
     fit_cfg.propagation = propagation_config;
 
     traccc::host::kalman_fitting_algorithm host_fitting(fit_cfg, host_mr);
@@ -272,17 +274,18 @@ int main(int argc, char* argv[]) {
     traccc::opts::track_seeding seeding_opts;
     traccc::opts::track_finding finding_opts;
     traccc::opts::track_propagation propagation_opts;
+    traccc::opts::track_fitting fitting_opts;
     traccc::opts::track_resolution resolution_opts;
     traccc::opts::performance performance_opts;
     traccc::opts::program_options program_opts{
         "Full Tracking Chain on the Host (without clusterization)",
         {detector_opts, input_opts, seeding_opts, finding_opts,
-         propagation_opts, resolution_opts, performance_opts},
+         propagation_opts, fitting_opts, resolution_opts, performance_opts},
         argc,
         argv};
 
     // Run the application.
-    return seq_run(seeding_opts, finding_opts, propagation_opts,
+    return seq_run(seeding_opts, finding_opts, propagation_opts, fitting_opts,
                    resolution_opts, input_opts, detector_opts,
                    performance_opts);
 }

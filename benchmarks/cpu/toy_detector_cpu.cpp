@@ -50,7 +50,7 @@ BENCHMARK_F(ToyDetectorBenchmark, CPU)(benchmark::State& state) {
         sim_dir + "toy_detector_surface_grids.json");
 
     // B field
-    auto field = detray::bfield::create_const_field(B);
+    auto field = detray::bfield::create_const_field<scalar_type>(B);
 
     // Algorithms
     traccc::seeding_algorithm sa(seeding_cfg, grid_cfg, filter_cfg, host_mr);
@@ -62,7 +62,7 @@ BENCHMARK_F(ToyDetectorBenchmark, CPU)(benchmark::State& state) {
     for (auto _ : state) {
 
 // Iterate over events
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic)
         for (unsigned int i_evt = 0; i_evt < n_events; i_evt++) {
 
             auto& spacepoints_per_event = spacepoints[i_evt];

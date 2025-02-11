@@ -9,6 +9,7 @@
 #include "traccc/definitions/common.hpp"
 #include "traccc/finding/finding_config.hpp"
 #include "traccc/fitting/fitting_config.hpp"
+#include "traccc/geometry/detector.hpp"
 #include "traccc/io/utils.hpp"
 #include "traccc/seeding/seeding_algorithm.hpp"
 #include "traccc/seeding/track_params_estimation.hpp"
@@ -17,11 +18,8 @@
 #include "traccc/simulation/smearing_writer.hpp"
 
 // Detray include(s).
-#include "detray/core/detector.hpp"
 #include "detray/definitions/units.hpp"
 #include "detray/detectors/bfield.hpp"
-#include "detray/geometry/mask.hpp"
-#include "detray/geometry/shapes/rectangle2D.hpp"
 #include "detray/io/frontend/detector_reader.hpp"
 #include "detray/io/frontend/detector_writer.hpp"
 #include "detray/navigation/detail/ray.hpp"
@@ -60,19 +58,19 @@ class ToyDetectorBenchmark : public benchmark::Fixture {
 
     static constexpr std::array<float, 2> phi_range{
         -traccc::constant<float>::pi, traccc::constant<float>::pi};
-    static constexpr std::array<float, 2> theta_range{
-        0.f, traccc::constant<float>::pi};
+    static constexpr std::array<float, 2> eta_range{-3, 3};
     static constexpr std::array<float, 2> mom_range{
         10.f * traccc::unit<float>::GeV, 100.f * traccc::unit<float>::GeV};
 
     static inline const std::string sim_dir = "toy_detector_benchmark/";
 
     // Detector type
-    using detector_type = detray::detector<detray::toy_metadata>;
+    using detector_type = traccc::toy_detector::host;
+    using scalar_type = detector_type::scalar_type;
 
     // B field value and its type
     // @TODO: Set B field as argument
-    using b_field_t = covfie::field<detray::bfield::const_bknd_t>;
+    using b_field_t = covfie::field<detray::bfield::const_bknd_t<scalar_type>>;
 
     static constexpr traccc::vector3 B{0, 0,
                                        2 * detray::unit<traccc::scalar>::T};
@@ -83,16 +81,21 @@ class ToyDetectorBenchmark : public benchmark::Fixture {
                      "the simulation data."
                   << std::endl;
 
+        // Apply correct propagation config
+        apply_propagation_config(finding_cfg.propagation);
+        apply_propagation_config(fitting_cfg.propagation);
+
         // Use deterministic random number generator for testing
         using uniform_gen_t = detray::detail::random_numbers<
             traccc::scalar, std::uniform_real_distribution<traccc::scalar>>;
 
         // Build the detector
         auto [det, name_map] =
-            detray::build_toy_detector(host_mr, get_toy_config());
+            detray::build_toy_detector<traccc::default_algebra>(
+                host_mr, get_toy_config());
 
         // B field
-        auto field = detray::bfield::create_const_field(B);
+        auto field = detray::bfield::create_const_field<scalar_type>(B);
 
         // Origin of particles
         using generator_type =
@@ -101,7 +104,7 @@ class ToyDetectorBenchmark : public benchmark::Fixture {
         generator_type::configuration gen_cfg{};
         gen_cfg.n_tracks(n_tracks);
         gen_cfg.phi_range(phi_range);
-        gen_cfg.theta_range(theta_range);
+        gen_cfg.eta_range(eta_range);
         gen_cfg.mom_range(mom_range);
         generator_type generator(gen_cfg);
 
@@ -127,6 +130,8 @@ class ToyDetectorBenchmark : public benchmark::Fixture {
             detray::muon<traccc::scalar>(), n_events, det, field,
             std::move(generator), std::move(smearer_writer_cfg), full_path);
 
+        // Same propagation configuration for sim and reco
+        apply_propagation_config(sim.get_config().propagation);
         // Set constrained step size to 1 mm
         sim.get_config().propagation.stepping.step_constraint =
             1.f * detray::unit<float>::mm;
@@ -143,16 +148,25 @@ class ToyDetectorBenchmark : public benchmark::Fixture {
         detray::io::write_detector(det, name_map, writer_cfg);
     }
 
-    detray::toy_det_config get_toy_config() const {
+    detray::toy_det_config<traccc::scalar> get_toy_config() const {
 
         // Create the toy geometry
-        detray::toy_det_config toy_cfg{};
+        detray::toy_det_config<traccc::scalar> toy_cfg{};
         toy_cfg.n_brl_layers(4u).n_edc_layers(7u).do_check(false);
 
         // @TODO: Increase the material budget again
         toy_cfg.module_mat_thickness(0.11f * detray::unit<traccc::scalar>::mm);
 
         return toy_cfg;
+    }
+
+    void apply_propagation_config(detray::propagation::config& cfg) const {
+        // Configure the propagation for the toy detector
+        cfg.navigation.search_window = {3, 3};
+        cfg.navigation.overstep_tolerance = -300.f * detray::unit<float>::um;
+        cfg.navigation.min_mask_tolerance = 1e-5f * detray::unit<float>::mm;
+        cfg.navigation.max_mask_tolerance = 3.f * detray::unit<float>::mm;
+        cfg.navigation.mask_tolerance_scalor = 0.05f;
     }
 
     void SetUp(::benchmark::State& /*state*/) {

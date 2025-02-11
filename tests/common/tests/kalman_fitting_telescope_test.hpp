@@ -54,8 +54,8 @@ class KalmanFittingTelescopeTests
     static constexpr scalar thickness = 0.5f * detray::unit<scalar>::mm;
 
     // Rectangle mask for the telescope geometry
-    static constexpr detray::mask<detray::rectangle2D> rectangle{0u, 100000.f,
-                                                                 100000.f};
+    static constexpr detray::mask<detray::rectangle2D, traccc::default_algebra>
+        rectangle{0u, 100000.f, 100000.f};
 
     /// Measurement smearing parameters
     static constexpr std::array<scalar, 2u> smearing{
@@ -63,11 +63,11 @@ class KalmanFittingTelescopeTests
 
     /// Standard deviations for seed track parameters
     static constexpr std::array<scalar, e_bound_size> stddevs = {
-        0.03f * detray::unit<scalar>::mm,
-        0.03f * detray::unit<scalar>::mm,
+        0.1f * detray::unit<scalar>::mm,
+        0.1f * detray::unit<scalar>::mm,
         0.017f,
         0.017f,
-        0.001f / detray::unit<scalar>::GeV,
+        0.05f / detray::unit<scalar>::GeV,
         1.f * detray::unit<scalar>::ns};
 
     void consistency_tests(const track_state_collection_types::host&
@@ -94,7 +94,7 @@ class KalmanFittingTelescopeTests
                                           unit<scalar>::mm);
         }
 
-        detray::tel_det_config<> tel_cfg{rectangle};
+        detray::tel_det_config tel_cfg{rectangle};
         tel_cfg.positions(plane_positions);
         tel_cfg.module_material(mat);
         tel_cfg.mat_thickness(thickness);

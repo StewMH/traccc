@@ -131,9 +131,16 @@ GTEST_TEST(AlpakaBasic, VecMemOp) {
     using WorkDiv = WorkDivMembers<Dim, Idx>;
     auto workDiv = WorkDiv{blocksPerGrid, threadsPerBlock, elementsPerThread};
 
-    traccc::alpaka::vecmem_resource::device_copy vm_copy;
-    traccc::alpaka::vecmem_resource::host_memory_resource host_mr;
-    traccc::alpaka::vecmem_resource::device_memory_resource device_mr;
+#ifdef ALPAKA_ACC_SYCL_ENABLED
+    ::sycl::queue q;
+    vecmem::sycl::queue_wrapper qw{&q};
+    traccc::alpaka::vecmem::device_copy vm_copy(qw);
+#else
+    traccc::alpaka::vecmem::device_copy vm_copy;
+#endif
+
+    traccc::alpaka::vecmem::host_memory_resource host_mr;
+    traccc::alpaka::vecmem::device_memory_resource device_mr;
 
     vecmem::vector<float> host_vector{n, &host_mr};
 

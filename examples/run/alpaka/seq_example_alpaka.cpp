@@ -18,9 +18,7 @@
 #include "traccc/clusterization/clusterization_algorithm.hpp"
 #include "traccc/device/container_d2h_copy_alg.hpp"
 #include "traccc/efficiency/seeding_performance_writer.hpp"
-#include "traccc/finding/combinatorial_kalman_filter_algorithm.hpp"
-#include "traccc/fitting/kalman_filter/kalman_fitter.hpp"
-#include "traccc/fitting/kalman_fitting_algorithm.hpp"
+#include "traccc/geometry/detector.hpp"
 #include "traccc/io/read_cells.hpp"
 #include "traccc/io/read_detector.hpp"
 #include "traccc/io/read_detector_description.hpp"
@@ -66,10 +64,30 @@ int seq_run(const traccc::opts::detector& detector_opts,
             const traccc::opts::performance& performance_opts,
             const traccc::opts::accelerator& accelerator_opts) {
 
+    // Output stats
+    uint64_t n_cells = 0;
+    uint64_t n_measurements = 0;
+    uint64_t n_spacepoints = 0;
+    uint64_t n_spacepoints_alpaka = 0;
+    uint64_t n_seeds = 0;
+    uint64_t n_seeds_alpaka = 0;
+
+    // Constant B field for the track finding and fitting
+    const traccc::vector3 field_vec = {0.f, 0.f,
+                                       seeding_opts.seedfinder.bFieldInZ};
+
     // Memory resources used by the application.
-    traccc::alpaka::vecmem_resource::host_memory_resource host_mr;
-    traccc::alpaka::vecmem_resource::device_memory_resource device_mr;
-    traccc::alpaka::vecmem_resource::device_copy copy;
+#ifdef ALPAKA_ACC_SYCL_ENABLED
+    ::sycl::queue q;
+    vecmem::sycl::queue_wrapper qw{&q};
+    traccc::alpaka::vecmem::device_copy copy(qw);
+    traccc::alpaka::vecmem::host_memory_resource host_mr(qw);
+    traccc::alpaka::vecmem::device_memory_resource device_mr(qw);
+#else
+    traccc::alpaka::vecmem::device_copy copy;
+    traccc::alpaka::vecmem::host_memory_resource host_mr;
+    traccc::alpaka::vecmem::device_memory_resource device_mr;
+#endif
     traccc::memory_resource mr{device_mr, &host_mr};
 
     // Construct the detector description object.
@@ -95,8 +113,7 @@ int seq_run(const traccc::opts::detector& detector_opts,
         traccc::io::read_detector(
             host_detector, host_mr, detector_opts.detector_file,
             detector_opts.material_file, detector_opts.grid_file);
-        device_detector =
-            detray::get_buffer(detray::get_data(host_detector), mr.main, copy);
+        device_detector = detray::get_buffer(host_detector, mr.main, copy);
         device_detector_view = detray::get_data(device_detector);
     }
 

@@ -1,6 +1,6 @@
 /** TRACCC library, part of the ACTS project (R&D line)
  *
- * (c) 2023-2024 CERN for the benefit of the ACTS project
+ * (c) 2023-2025 CERN for the benefit of the ACTS project
  *
  * Mozilla Public License Version 2.0
  */
@@ -18,9 +18,7 @@
 #include "traccc/efficiency/nseed_performance_writer.hpp"
 #include "traccc/efficiency/seeding_performance_writer.hpp"
 #include "traccc/efficiency/track_filter.hpp"
-#include "traccc/finding/combinatorial_kalman_filter_algorithm.hpp"
-#include "traccc/fitting/kalman_filter/kalman_fitter.hpp"
-#include "traccc/fitting/kalman_fitting_algorithm.hpp"
+#include "traccc/geometry/detector.hpp"
 #include "traccc/io/read_detector.hpp"
 #include "traccc/io/read_detector_description.hpp"
 #include "traccc/io/read_measurements.hpp"
@@ -32,6 +30,7 @@
 #include "traccc/options/performance.hpp"
 #include "traccc/options/program_options.hpp"
 #include "traccc/options/track_finding.hpp"
+#include "traccc/options/track_fitting.hpp"
 #include "traccc/options/track_propagation.hpp"
 #include "traccc/options/track_seeding.hpp"
 #include "traccc/performance/collection_comparator.hpp"
@@ -42,7 +41,6 @@
 
 // Detray include(s).
 #include "detray/core/detector.hpp"
-#include "detray/core/detector_metadata.hpp"
 #include "detray/detectors/bfield.hpp"
 #include "detray/io/frontend/detector_reader.hpp"
 #include "detray/navigation/navigator.hpp"
@@ -57,34 +55,29 @@
 using namespace traccc;
 
 int seq_run(const traccc::opts::track_seeding& seeding_opts,
-            const traccc::opts::track_finding& finding_opts,
-            const traccc::opts::track_propagation& propagation_opts,
+            const traccc::opts::track_finding& /*finding_opts*/,
+            const traccc::opts::track_propagation& /*propagation_opts*/,
+            const traccc::opts::track_fitting& /*fitting_opts*/,
             const traccc::opts::input_data& input_opts,
             const traccc::opts::detector& detector_opts,
             const traccc::opts::performance& performance_opts,
             const traccc::opts::accelerator& accelerator_opts) {
 
-    /// Type declarations
-    using b_field_t = covfie::field<detray::bfield::const_bknd_t>;
-    using rk_stepper_type = detray::rk_stepper<
-        b_field_t::view_t,
-        typename traccc::default_detector::host::algebra_type,
-        detray::constrained_step<>>;
-    using host_navigator_type =
-        detray::navigator<const traccc::default_detector::host>;
-    using host_fitter_type =
-        traccc::kalman_fitter<rk_stepper_type, host_navigator_type>;
-    using device_navigator_type =
-        detray::navigator<const traccc::default_detector::device>;
-    using device_fitter_type =
-        traccc::kalman_fitter<rk_stepper_type, device_navigator_type>;
-
-    // Memory resources used by the application.
-    traccc::alpaka::vecmem_resource::device_copy copy;
-    traccc::alpaka::vecmem_resource::host_memory_resource host_mr;
-    traccc::alpaka::vecmem_resource::device_memory_resource device_mr;
-    traccc::alpaka::vecmem_resource::managed_memory_resource mng_mr;
+#ifdef ALPAKA_ACC_SYCL_ENABLED
+    ::sycl::queue q;
+    vecmem::sycl::queue_wrapper qw{&q};
+    traccc::alpaka::vecmem::device_copy copy(qw);
+    traccc::alpaka::vecmem::host_memory_resource host_mr(qw);
+    traccc::alpaka::vecmem::device_memory_resource device_mr(qw);
+    traccc::alpaka::vecmem::managed_memory_resource mng_mr(qw);
     traccc::memory_resource mr{device_mr, &host_mr};
+#else
+    traccc::alpaka::vecmem::device_copy copy;
+    traccc::alpaka::vecmem::host_memory_resource host_mr;
+    traccc::alpaka::vecmem::device_memory_resource device_mr;
+    traccc::alpaka::vecmem::managed_memory_resource mng_mr;
+    traccc::memory_resource mr{device_mr, &host_mr};
+#endif
 
     // Performance writer
     traccc::seeding_performance_writer sd_performance_writer(
@@ -459,16 +452,18 @@ int main(int argc, char* argv[]) {
     traccc::opts::track_seeding seeding_opts;
     traccc::opts::track_finding finding_opts;
     traccc::opts::track_propagation propagation_opts;
+    traccc::opts::track_fitting fitting_opts;
     traccc::opts::performance performance_opts;
     traccc::opts::accelerator accelerator_opts;
     traccc::opts::program_options program_opts{
         "Full Tracking Chain Using Alpaka (without clusterization)",
         {detector_opts, input_opts, seeding_opts, finding_opts,
-         propagation_opts, performance_opts, accelerator_opts},
+         propagation_opts, fitting_opts, performance_opts, accelerator_opts},
         argc,
         argv};
 
     // Run the application.
-    return seq_run(seeding_opts, finding_opts, propagation_opts, input_opts,
-                   detector_opts, performance_opts, accelerator_opts);
+    return seq_run(seeding_opts, finding_opts, propagation_opts, fitting_opts,
+                   input_opts, detector_opts, performance_opts,
+                   accelerator_opts);
 }
