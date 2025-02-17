@@ -20,6 +20,12 @@
 #include "traccc/finding/actors/interaction_register.hpp"
 #include "traccc/geometry/detector.hpp"
 
+// Detray include(s)
+#include <detray/detectors/bfield.hpp>
+#include <detray/propagator/actors.hpp>
+#include <detray/propagator/propagator.hpp>
+#include <detray/propagator/rk_stepper.hpp>
+
 namespace traccc::cuda::kernels {
 
 using default_detector_type = traccc::default_detector::device;
