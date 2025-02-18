@@ -76,11 +76,8 @@ thrust_create_target( traccc::cuda_thrust
   DEVICE CUDA )
   target_link_libraries(traccc::cuda_thrust INTERFACE CUDA::cudart)
   list(APPEND PRIVATE_LIBRARIES traccc::cuda_thrust)
-else()
-thrust_create_target (traccc::alpaka_thrust
-  HOST CPP
-  DEVICE CPP )
-  list(APPEND PRIVATE_LIBRARIES traccc::alpaka_thrust)
+elseif(alpaka_ACC_GPU_HIP_ENABLE)
+  list(APPEND PRIVATE_LIBRARIES rocthrust)
 endif()
 
 target_link_libraries(traccc_alpaka PUBLIC ${PUBLIC_LIBRARIES} PRIVATE ${PRIVATE_LIBRARIES})

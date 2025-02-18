@@ -59,7 +59,7 @@ class finding_algorithm
 
     /// Actor chain for propagate to the next surface and its propagator type
     using actor_type = detray::actor_chain<
-        detray::dtuple, detray::pathlimit_aborter<scalar_type>,
+        detray::pathlimit_aborter<scalar_type>,
         detray::parameter_transporter<algebra_type>,
         interaction_register<interactor>, interactor, ckf_aborter>;
 

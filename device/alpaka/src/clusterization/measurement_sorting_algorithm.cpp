@@ -9,6 +9,7 @@
 #include "traccc/alpaka/clusterization/measurement_sorting_algorithm.hpp"
 
 #include <thrust/sort.h>
+#include <thrust/execution_policy.h>
 
 namespace traccc::alpaka {
 

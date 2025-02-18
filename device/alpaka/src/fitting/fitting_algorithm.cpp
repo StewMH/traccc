@@ -20,6 +20,7 @@
 
 // Thrust include(s).
 #include <thrust/sort.h>
+#include <thrust/execution_policy.h>
 
 // System include(s).
 #include <memory_resource>
